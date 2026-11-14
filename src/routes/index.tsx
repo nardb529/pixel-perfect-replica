@@ -1,23 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
-export const Route = createFileRoute("/")({
-  component: Index,
-});
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { ArrowRight, ArrowUpRight, Check, GraduationCap, Sparkles, HeartHandshake } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/campus/shared';
+import { BRAND } from '@/lib/campus/data';
+import { pageHead } from '@/lib/campus/meta';
+import welcome from '@/assets/campus-welcome.jpg';
+export const Route = createFileRoute('/')({ head: () => pageHead('Your campus. Your marketplace.', 'Discover great finds, useful services and amazing people across university communities in Ghana. Browse freely on CampusLoop.'), component: Welcome });
+function Welcome() { return <div className="welcome"><header className="welcome-header"><Logo/><div className="welcome-header-right"><span>Made for campus life <span>🇬🇭</span></span><Link to="/auth" className="text-link">Already in the loop? <ArrowUpRight size={15}/></Link></div></header><main className="welcome-scene"><img className="welcome-image" src={welcome} alt="Campus essentials: a laptop, headphones, sneakers, books and a camera" width={1536} height={1024} fetchPriority="high"/><div className="welcome-content"><div className="welcome-content-inner"><span className="welcome-eyebrow"><Sparkles size={13}/>A LITTLE MORE CONNECTED. A LOT MORE CAMPUS.</span><h1>Your campus.<br/>Your <span>marketplace.</span></h1><p className="welcome-description">Discover great finds, useful services and amazing people across university communities in Ghana.</p><div className="welcome-buttons"><Button size="lg" asChild><Link to="/discover">Explore Marketplace <ArrowRight size={17}/></Link></Button><Button variant="outline" size="lg" asChild><Link to="/auth">Sell or Offer a Service <ArrowUpRight size={17}/></Link></Button></div><p className="no-signup"><Check size={12}/>Just browsing? No sign-up needed.</p></div></div><div className="floating-note"><span className="floating-note-icon"><HeartHandshake size={18}/></span><div><strong>From your campus, with love.</strong><p>Good finds. Real connections.</p></div></div></main><section className="welcome-bottom"><p>One community. So many possibilities.</p><div className="campus-names"><span><GraduationCap size={19}/>KNUST</span><span><GraduationCap size={19}/>University of Ghana</span><span><GraduationCap size={19}/>UCC</span><span><GraduationCap size={19}/>UPSA</span><span>+ more campuses</span></div></section><footer className="welcome-tail">Find your people. Find your next favourite. Find your loop. <span>© {new Date().getFullYear()} {BRAND}</span></footer></div>; }
