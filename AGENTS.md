@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Prototype architecture
+- Keep all marketplace data and simulated sessions in the shared client-side CampusProvider; the brief explicitly excludes real services and persistent accounts.
+- Keep route files thin and reuse marketplace components; independent URLs must remain navigable directly.
+- Define the configurable brand and filtering logic in browser-safe shared data modules so future integrations do not require presentation rewrites.
