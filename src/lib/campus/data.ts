@@ -9,7 +9,7 @@ export const BRAND = 'CampusLoop';
 export const universities = ['KNUST', 'University of Ghana', 'University of Cape Coast', 'UPSA', 'University of Education, Winneba', 'University for Development Studies', 'University of Mines and Technology', 'Other institutions'];
 export const productCategories = ['Electronics', 'Fashion', 'Books & Academics', 'Food & Groceries', 'Beauty', 'Hostel Essentials', 'Sports', 'Others'];
 export const serviceCategories = ['Graphic Design', 'Photography', 'Hair & Beauty', 'Technology & Repairs', 'Tutoring', 'Laundry', 'Printing', 'Food Services', 'Transport', 'Others'];
-export type Listing = { id: string; title: string; type: 'product' | 'service'; category: string; price: number; image: string; images?: string[]; seller: string; university: string; audience: string[]; description: string; condition?: string; time: string; status: 'Active' | 'Paused' | 'Sold' | 'Unavailable'; views: number; likes: number; owner?: boolean; contact?: string };
+export type Listing = { id: string; title: string; type: 'product' | 'service'; category: string; price: number; image: string; images?: string[]; seller: string; university: string; audience: string[]; description: string; condition?: string; time: string; status: 'Active' | 'Paused' | 'Sold' | 'Unavailable'; views: number; likes: number; ownerEmail?: string; contact?: string; contactMethod?: string; postedAt?: number };
 export const initialListings: Listing[] = [
  { id: 'hp-laptop', title: 'HP EliteBook 840 G5', type: 'product', category: 'Electronics', price: 2450, image: laptop, seller: 'Kwame Asante', university: 'KNUST', audience: ['KNUST'], description: 'A reliable companion for lectures, projects and everything in between. Intel Core i5, 8GB RAM and a 256GB SSD. Battery lasts around 4 hours. Charger included. You’re welcome to inspect it on campus before deciding.', condition: 'Used', time: '2 hours ago', status: 'Active', views: 128, likes: 12 },
  { id: 'green-sneakers', title: 'Green & white everyday sneakers', type: 'product', category: 'Fashion', price: 180, image: sneakers, seller: 'Ama Mensah', university: 'University of Ghana', audience: ['All Universities'], description: 'Fresh green and white low-tops, perfect for your everyday campus rotation. Available in sizes 38–44. Meet up on campus to try your pair.', condition: 'New', time: '3 hours ago', status: 'Active', views: 94, likes: 18 },
@@ -24,4 +24,18 @@ export function filterListings(listings: Listing[], university: string, query = 
  return listings.filter(l => l.status === 'Active' && (university === 'All Universities' || l.audience.includes('All Universities') || l.audience.includes(university)) && (!type || l.type === type) && (category === 'All' || l.category === category) && l.price <= maxPrice && `${l.title} ${l.seller} ${l.category}`.toLowerCase().includes(query.toLowerCase()));
 }
 export function canManage(user: unknown) { return Boolean(user); }
+export function ownsListing(listing: Listing, email?: string) { return Boolean(email && listing.ownerEmail === email); }
+export function validatePassword(password: string, confirm?: string) {
+ if (password.length < 8) return 'Use a password with at least 8 characters.';
+ if (confirm !== undefined && password !== confirm) return 'Your passwords don’t match. Please try again.';
+ return '';
+}
+export function validateListing(values: { type: 'product' | 'service'; title: string; description: string; price: string; images: string[]; audience: string[]; contact: string }) {
+ if (!values.images.length) return 'Add at least one image.';
+ if (!values.title.trim() || !values.description.trim()) return 'Add a name and description.';
+ if ((values.type === 'product' && !values.price.trim()) || (values.price.trim() && (!Number.isFinite(Number(values.price)) || Number(values.price) < 0))) return 'Enter a valid price in GH₵.';
+ if (!values.audience.length) return 'Choose at least one university.';
+ if (!values.contact.trim()) return 'Add your contact details.';
+ return '';
+}
 export const money = (amount: number) => `GH₵ ${amount.toLocaleString('en-GH')}`;
