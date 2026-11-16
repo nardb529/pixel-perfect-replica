@@ -469,6 +469,16 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="header-actions">
               <UniversitySelect />
               <ThemeToggle compact />
+              {user?.role === "admin" && (
+                <Link
+                  to="/admin"
+                  className="header-icon-btn header-admin-btn"
+                  title="Admin Command Center"
+                  aria-label="Admin Command Center"
+                >
+                  <Shield size={16} />
+                </Link>
+              )}
               <Button
                 className="desktop-post"
                 onClick={() => navigate({ to: user ? "/post" : "/auth" })}

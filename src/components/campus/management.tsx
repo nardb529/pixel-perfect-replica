@@ -17,6 +17,7 @@ import {
   Heart,
   Bell,
   TrendingUp,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -311,16 +312,26 @@ export function DashboardPage() {
 
         <div className="dashboard-top">
           <PageIntro
-            eyebrow="Seller studio"
+            eyebrow={user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
             title={`Welcome back, ${user.name.split(" ")[0]}`}
             text="Manage your products, services, performance and enquiries."
           />
-          <Button className="dashboard-create-btn" asChild>
-            <Link to="/post">
-              <Plus size={16} />
-              Create listing
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {user.role === "admin" && (
+              <Button variant="outline" className="admin-launch-btn" asChild>
+                <Link to="/admin">
+                  <Shield size={15} />
+                  Admin Command Center
+                </Link>
+              </Button>
+            )}
+            <Button className="dashboard-create-btn" asChild>
+              <Link to="/post">
+                <Plus size={16} />
+                Create listing
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div className="dashboard-nav" role="tablist" aria-label="Dashboard sections">

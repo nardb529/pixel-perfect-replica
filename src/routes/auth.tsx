@@ -1,5 +1,11 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { PagePendingFallback } from "@/components/campus/shared";
 import { pageHead } from "@/lib/campus/meta";
+
+const AuthPage = lazy(() =>
+  import("@/components/campus/auth").then((m) => ({ default: m.AuthPage })),
+);
 
 export const Route = createFileRoute("/auth")({
   head: () =>
@@ -7,5 +13,13 @@ export const Route = createFileRoute("/auth")({
       "Join the seller community",
       "Preview signing up or logging in to sell products and offer services on CampusLoop.",
     ),
-  component: lazyRouteComponent(() => import("@/components/campus/auth"), "AuthPage"),
+  component: AuthRouteComponent,
 });
+
+function AuthRouteComponent() {
+  return (
+    <Suspense fallback={<PagePendingFallback />}>
+      <AuthPage />
+    </Suspense>
+  );
+}

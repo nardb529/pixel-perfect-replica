@@ -15,6 +15,7 @@ import {
   Sun,
   ChevronRight,
   ExternalLink,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -391,6 +392,14 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
           <div className="quick-actions profile-actions">
             {user ? (
               <>
+                {user.role === "admin" && (
+                  <Button variant="outline" className="admin-launch-btn" asChild>
+                    <Link to="/admin">
+                      <Shield size={15} />
+                      Admin Console
+                    </Link>
+                  </Button>
+                )}
                 <Button className="dashboard-create-btn" asChild>
                   <Link to="/dashboard">Dashboard</Link>
                 </Button>

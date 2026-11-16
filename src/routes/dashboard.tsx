@@ -1,5 +1,11 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { PagePendingFallback } from "@/components/campus/shared";
 import { pageHead } from "@/lib/campus/meta";
+
+const DashboardPage = lazy(() =>
+  import("@/components/campus/management").then((m) => ({ default: m.DashboardPage })),
+);
 
 export const Route = createFileRoute("/dashboard")({
   head: () =>
@@ -7,5 +13,13 @@ export const Route = createFileRoute("/dashboard")({
       "Your seller dashboard",
       "Manage your campus listings and see interest in your products and services.",
     ),
-  component: lazyRouteComponent(() => import("@/components/campus/management"), "DashboardPage"),
+  component: DashboardRouteComponent,
 });
+
+function DashboardRouteComponent() {
+  return (
+    <Suspense fallback={<PagePendingFallback />}>
+      <DashboardPage />
+    </Suspense>
+  );
+}

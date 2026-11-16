@@ -29,6 +29,7 @@ vi.mock("@tanstack/react-router", async () => {
 });
 
 import { ListingCard } from "@/components/campus/shared";
+import { AdminPage } from "@/components/campus/admin";
 
 describe("AnimatedSelect dropdown", () => {
   it("opens options, updates value, and syncs hidden form input", () => {
@@ -97,5 +98,30 @@ describe("ListingCard actions", () => {
 
     fireEvent.click(contactBtn);
     expect(screen.getByText(`Contact ${service.seller}`)).toBeInTheDocument();
+  });
+});
+
+describe("AdminPage Command Center", () => {
+  it("renders command overview KPIs and switches across management sections", () => {
+    render(
+      <CampusProvider>
+        <AdminPage />
+      </CampusProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Platform Administration" })).toBeInTheDocument();
+    expect(screen.getByText("Campus Distribution & Action Queue")).toBeInTheDocument();
+
+    const listingsTab = screen.getByRole("tab", { name: /Listings/i });
+    fireEvent.click(listingsTab);
+    expect(screen.getByText("All Marketplace Listings")).toBeInTheDocument();
+
+    const announcementsTab = screen.getByRole("tab", { name: /Announcements/i });
+    fireEvent.click(announcementsTab);
+    expect(screen.getByText("Announcements & User Notifications")).toBeInTheDocument();
+
+    const auditTab = screen.getByRole("tab", { name: /Audit Log/i });
+    fireEvent.click(auditTab);
+    expect(screen.getByText("Moderation & Admin Audit Log")).toBeInTheDocument();
   });
 });

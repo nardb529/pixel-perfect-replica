@@ -117,9 +117,9 @@ export function AuthPage() {
         await authenticationService.signIn(email, password);
       }
 
-      await refreshProfile();
+      const signedInUser = await refreshProfile();
       triggerSellerPostAuth();
-      navigate({ to: "/dashboard" });
+      navigate({ to: signedInUser?.role === "admin" ? "/admin" : "/dashboard" });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to complete authentication. Try again.";

@@ -127,7 +127,7 @@ type Store = {
   user: DemoUser | null;
   setUser: (v: DemoUser | null) => void;
   signOutUser: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<DemoUser | null>;
   rememberedAccounts: Record<string, DemoUser>;
   registerAccount: (account: DemoUser) => void;
   listings: Listing[];
@@ -291,10 +291,10 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshProfile = useCallback(async () => {
+  const refreshProfile = useCallback(async (): Promise<DemoUser | null> => {
     if (!isSupabaseConfigured) {
       setAuthLoading(false);
-      return;
+      return null;
     }
     try {
       const session = await authenticationService.getSession();
@@ -304,7 +304,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         setNotifications([]);
         setSaved(favoriteService.getAnonymousFavorites());
         setAuthLoading(false);
-        return;
+        return null;
       }
 
       const [profile, unis] = await Promise.all([
@@ -324,12 +324,13 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         setDbUniversities(unis);
       }
 
+      let resolvedUser: DemoUser;
       if (profile) {
-        const mapped = mapProfileToUser(profile, unis);
-        setUserState(mapped);
-        setMyUniversity(mapped.university);
+        resolvedUser = mapProfileToUser(profile, unis);
+        setUserState(resolvedUser);
+        setMyUniversity(resolvedUser.university);
       } else {
-        setUserState({
+        resolvedUser = {
           id: session.user.id,
           name: String(session.user.user_metadata?.["full_name"] || "Campus Seller"),
           email: session.user.email || "",
@@ -337,7 +338,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
           capability: String(session.user.user_metadata?.["account_type"] || "Both"),
           bio: "",
           contact: "WhatsApp",
-        });
+        };
+        setUserState(resolvedUser);
       }
 
       const [favIds, mine, notifs] = await Promise.all([
@@ -348,8 +350,9 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       setSaved(favIds);
       setMyListings(mine);
       setNotifications(notifs);
+      return resolvedUser;
     } catch {
-      // Keep UI responsive even when remote schema is still initializing
+      return null;
     } finally {
       setAuthLoading(false);
     }

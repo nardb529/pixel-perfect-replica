@@ -1,11 +1,25 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { PagePendingFallback } from "@/components/campus/shared";
 import { pageHead } from "@/lib/campus/meta";
+
+const AdminPage = lazy(() =>
+  import("@/components/campus/admin").then((m) => ({ default: m.AdminPage })),
+);
 
 export const Route = createFileRoute("/admin")({
   head: () =>
     pageHead(
-      "Community admin preview",
-      "Explore the separate frontend moderation and campus management preview.",
+      "Community admin console",
+      "Manage CampusLoop listings, sellers, reports, universities, categories, and announcements.",
     ),
-  component: lazyRouteComponent(() => import("@/components/campus/admin"), "AdminPage"),
+  component: AdminRouteComponent,
 });
+
+function AdminRouteComponent() {
+  return (
+    <Suspense fallback={<PagePendingFallback />}>
+      <AdminPage />
+    </Suspense>
+  );
+}
