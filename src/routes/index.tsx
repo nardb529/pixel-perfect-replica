@@ -1,9 +1,196 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { ArrowRight, ArrowUpRight, Check, GraduationCap, Sparkles, HeartHandshake } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/campus/shared';
-import { BRAND } from '@/lib/campus/data';
-import { pageHead } from '@/lib/campus/meta';
-import welcome from '@/assets/campus-welcome.jpg';
-export const Route = createFileRoute('/')({ head: () => pageHead('Your campus. Your marketplace.', 'Discover great finds, useful services and amazing people across university communities in Ghana. Browse freely on CampusLoop.'), component: Welcome });
-function Welcome() { return <div className="welcome"><header className="welcome-header"><Logo/><div className="welcome-header-right"><span>Made for campus life <span>🇬🇭</span></span><Link to="/auth" className="text-link">Already in the loop? <ArrowUpRight size={15}/></Link></div></header><main className="welcome-scene"><img className="welcome-image" src={welcome} alt="Campus essentials: a laptop, headphones, sneakers, books and a camera" width={1536} height={1024} fetchPriority="high"/><div className="welcome-content"><div className="welcome-content-inner"><span className="welcome-eyebrow"><Sparkles size={13}/>A LITTLE MORE CONNECTED. A LOT MORE CAMPUS.</span><h1>Your campus.<br/>Your <span>marketplace.</span></h1><p className="welcome-description">Discover great finds, useful services and amazing people across university communities in Ghana.</p><div className="welcome-buttons"><Button size="lg" asChild><Link to="/discover">Explore Marketplace <ArrowRight size={17}/></Link></Button><Button variant="outline" size="lg" asChild><Link to="/auth">Sell or Offer a Service <ArrowUpRight size={17}/></Link></Button></div><p className="no-signup"><Check size={12}/>Just browsing? No sign-up needed.</p></div></div><div className="floating-note"><span className="floating-note-icon"><HeartHandshake size={18}/></span><div><strong>From your campus, with love.</strong><p>Good finds. Real connections.</p></div></div></main><section className="welcome-bottom"><p>One community. So many possibilities.</p><div className="campus-names"><span><GraduationCap size={19}/>KNUST</span><span><GraduationCap size={19}/>University of Ghana</span><span><GraduationCap size={19}/>UCC</span><span><GraduationCap size={19}/>UPSA</span><span>+ more campuses</span></div></section><footer className="welcome-tail">Find your people. Find your next favourite. Find your loop. <span>© {new Date().getFullYear()} {BRAND}</span></footer></div>; }
+import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { BrandMark, ThemeToggle } from "@/components/campus/shared";
+import { useCampus } from "@/components/campus/store";
+import { BRAND } from "@/lib/campus/data";
+import { pageHead } from "@/lib/campus/meta";
+import laptop from "@/assets/laptop.jpg";
+import sneakers from "@/assets/sneakers.jpg";
+import photographer from "@/assets/photographer.jpg";
+import headphones from "@/assets/headphones.jpg";
+
+export const Route = createFileRoute("/")({
+  head: () =>
+    pageHead(
+      "Your campus. Your loop.",
+      "Discover products, services and student talent across Ghanaian university communities.",
+    ),
+  component: Welcome,
+});
+
+type LaunchPhase = "splash" | "exiting" | "ready";
+
+function Welcome() {
+  const { triggerBuyerInstallPrompt } = useCampus();
+  const navigate = useNavigate();
+  const router = useRouter();
+  const [phase, setPhase] = useState<LaunchPhase>("splash");
+
+  useEffect(() => {
+    void router.preloadRoute({ to: "/discover" }).catch(() => undefined);
+    void router.preloadRoute({ to: "/auth" }).catch(() => undefined);
+
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const holdMs = reduced ? 350 : 950;
+    const exitMs = reduced ? 100 : 220;
+
+    let exitTimer: number | undefined;
+    const holdTimer = window.setTimeout(() => {
+      setPhase("exiting");
+      exitTimer = window.setTimeout(() => setPhase("ready"), exitMs);
+    }, holdMs);
+
+    return () => {
+      window.clearTimeout(holdTimer);
+      if (exitTimer !== undefined) window.clearTimeout(exitTimer);
+    };
+  }, [router]);
+
+  function skipSplash() {
+    if (phase !== "splash") return;
+    setPhase("exiting");
+    window.setTimeout(() => setPhase("ready"), 180);
+  }
+
+  function handleExplore() {
+    triggerBuyerInstallPrompt();
+    navigate({ to: "/discover" });
+  }
+
+  return (
+    <div className="launch-screen">
+      <div className="launch-ambient" aria-hidden="true">
+        <span className="launch-orb launch-orb-one" />
+        <span className="launch-orb launch-orb-two" />
+        <span className="launch-orb launch-orb-three" />
+        <svg
+          className="launch-ribbon"
+          viewBox="0 0 1200 500"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M-40 310 C 210 110, 440 430, 720 220 C 930 60, 1080 280, 1260 170"
+            stroke="currentColor"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
+          <path
+            d="M-40 380 C 240 210, 510 490, 810 280 C 1020 130, 1120 330, 1260 250"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeDasharray="10 10"
+            strokeLinecap="round"
+          />
+          <path
+            d="M-40 185 C 220 320, 480 40, 760 210 C 960 330, 1110 120, 1260 195"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            opacity="0.48"
+          />
+        </svg>
+      </div>
+
+      {phase !== "ready" ? (
+        <div
+          className={`splash-intro ${phase === "exiting" ? "is-exiting" : ""}`}
+          onClick={skipSplash}
+          role="button"
+          tabIndex={0}
+          aria-label={`${BRAND} launching`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") skipSplash();
+          }}
+        >
+          <h1 className="sr-only">{BRAND}</h1>
+
+          <div className="launch-orbital" aria-hidden="true">
+            <figure className="launch-tile launch-tile-a">
+              <img src={sneakers} alt="" width={400} height={400} decoding="async" />
+            </figure>
+            <figure className="launch-tile launch-tile-b">
+              <img src={headphones} alt="" width={400} height={400} decoding="async" />
+            </figure>
+            <figure className="launch-tile launch-tile-c">
+              <img src={photographer} alt="" width={400} height={400} decoding="async" />
+            </figure>
+            <figure className="launch-tile launch-tile-d">
+              <img src={laptop} alt="" width={400} height={400} decoding="async" />
+            </figure>
+          </div>
+
+          <div className="splash-center">
+            <span className="splash-aura" aria-hidden="true" />
+            <span className="splash-ring-outer" aria-hidden="true" />
+            <span className="splash-ring-inner" aria-hidden="true" />
+            <span className="splash-sonar" aria-hidden="true" />
+            <div className="splash-emblem-core">
+              <BrandMark size={84} animated />
+            </div>
+            <div className="splash-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="launch-topbar">
+            <ThemeToggle />
+          </div>
+
+          <div className="launch-stage">
+            <div className="launch-orbital" aria-hidden="true">
+              <figure className="launch-tile launch-tile-a">
+                <img src={sneakers} alt="" width={400} height={400} />
+              </figure>
+              <figure className="launch-tile launch-tile-b">
+                <img src={headphones} alt="" width={400} height={400} />
+              </figure>
+              <figure className="launch-tile launch-tile-c">
+                <img src={photographer} alt="" width={400} height={400} />
+              </figure>
+              <figure className="launch-tile launch-tile-d">
+                <img src={laptop} alt="" width={400} height={400} />
+              </figure>
+            </div>
+
+            <div className="launch-center-card">
+              <div className="launch-emblem">
+                <BrandMark size={64} animated />
+              </div>
+              <h1 className="launch-wordmark">
+                {BRAND}
+                <span>.</span>
+              </h1>
+              <p className="launch-tagline">Your campus. Your loop.</p>
+            </div>
+          </div>
+
+          <div className="launch-dock">
+            <Button size="lg" className="launch-primary" onClick={handleExplore}>
+              Explore Marketplace
+              <ArrowRight size={18} />
+            </Button>
+            <Button variant="outline" size="lg" className="launch-secondary" asChild>
+              <Link to="/auth">
+                Sell or Offer a Service
+                <ArrowUpRight size={17} />
+              </Link>
+            </Button>
+            <div className="launch-hint-pill">
+              <span>Browse freely without an account</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

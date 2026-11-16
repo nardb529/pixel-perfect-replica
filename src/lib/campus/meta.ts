@@ -1,2 +1,11 @@
-import { BRAND } from './data';
-export const pageHead = (title: string, description: string) => ({ meta: [{ title: `${title} · ${BRAND}` }, { name: 'description', content: description }, { property: 'og:title', content: `${title} · ${BRAND}` }, { property: 'og:description', content: description }, { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' }] });
+import { BRAND } from "./data";
+export const pageHead = (title: string, description: string) => ({
+  meta: [
+    { title: `${title} · ${BRAND}` },
+    { name: "description", content: description },
+    { property: "og:title", content: `${title} · ${BRAND}` },
+    { property: "og:description", content: description },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ],
+});
