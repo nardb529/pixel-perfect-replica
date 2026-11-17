@@ -45,6 +45,13 @@ export function requireSupabase(): SupabaseClient {
   return client;
 }
 
+export async function getSessionUser(client?: SupabaseClient | null) {
+  const target = client ?? getSupabaseClient();
+  if (!target) return null;
+  const { data } = await target.auth.getSession();
+  return data.session?.user ?? null;
+}
+
 export function isSchemaMissingError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const record = err as { code?: unknown; message?: unknown };
@@ -76,6 +83,15 @@ export function getVisitorSessionId(): string {
     return generated;
   } catch {
     return "anon-browser";
+  }
+}
+
+export function resetVisitorSessionId(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(VISITOR_SESSION_KEY);
+  } catch {
+    // Ignore storage errors
   }
 }
 

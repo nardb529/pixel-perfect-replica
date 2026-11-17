@@ -9,9 +9,10 @@ declare const Deno: {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
 };
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,12 +50,20 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as {
+    let body: {
       listingId?: string;
       contactMethod?: string;
       universityId?: string | null;
       visitorSessionId?: string;
     };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON request body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const listingId = body.listingId?.trim() || "";
     const rawMethod = body.contactMethod?.trim() || "WhatsApp";
@@ -76,9 +85,10 @@ Deno.serve(async (req: Request) => {
 
     const { data: listing, error: listingErr } = await adminClient
       .from("listings")
-      .select("id, seller_id, title, status, contact_method, contact_value")
+      .select("id, seller_id, title, status, contact_method, contact_value, expires_at")
       .eq("id", listingId)
       .eq("status", "Active")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .maybeSingle();
 
     if (listingErr || !listing) {
@@ -141,12 +151,10 @@ Deno.serve(async (req: Request) => {
       },
     );
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unexpected error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    console.error("contact-track unhandled error:", err);
+    return new Response(JSON.stringify({ error: "Unable to process contact request" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

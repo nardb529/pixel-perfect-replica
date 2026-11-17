@@ -352,7 +352,8 @@
   flex-direction: column;
   justify-content: space-between;
   background: var(--background);
-  padding: max(18px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(22px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
 }
 .launch-topbar {
   position: relative;
@@ -707,7 +708,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 8px
+    max(14px, env(safe-area-inset-left));
   background: var(--accent);
   color: var(--primary);
   font-size: 12px;
@@ -715,9 +717,64 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Global Error Boundary & Root Fallbacks */
+.error-boundary-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.error-boundary-card {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  padding: 28px 24px;
+}
+.error-boundary-orb {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  margin: 0 auto 14px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+.error-boundary-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.error-boundary-title {
+  margin-top: 6px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+.error-boundary-desc {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+.error-boundary-actions {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* App Shell & Navigation */
 .app-shell {
-  min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: clip;
@@ -726,7 +783,8 @@
   position: sticky;
   top: 0;
   z-index: 35;
-  padding: 12px 24px 4px;
+  padding: max(12px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 4px
+    max(24px, env(safe-area-inset-left));
   pointer-events: none;
 }
 .app-header {
@@ -2449,7 +2507,8 @@
   flex-shrink: 0;
 }
 .auth-main {
-  padding: 32px 24px;
+  padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+    max(28px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   display: flex;
   justify-content: center;
   align-items: center;
@@ -3208,14 +3267,16 @@
   margin: auto !important;
   translate: none !important;
   height: fit-content !important;
-  max-width: 404px !important;
-  width: calc(100vw - 24px) !important;
+  max-height: calc(90dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  max-width: min(404px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+  width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
   border-radius: 34px !important;
   border: 1px solid var(--border) !important;
   background: var(--card) !important;
   padding: 14px !important;
   gap: 0 !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
   box-shadow: var(--shadow-float) !important;
   animation: onboardingSpringIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both !important;
 }
@@ -3801,9 +3862,9 @@
   color: var(--muted-foreground);
 }
 .mobile-dialog {
-  max-height: 88dvh;
+  max-height: calc(88dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   overflow-y: auto;
-  width: calc(100vw - 24px);
+  width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
 }
 
 .admin-launch-btn {
@@ -4738,18 +4799,19 @@
 /* Desktop & Laptop Wide Canvas (Does NOT affect tablet <= 1100px or mobile) */
 @media (min-width: 1101px) {
   .app-header-wrap {
-    padding: 14px clamp(20px, 2.2vw, 38px) 4px;
+    padding: max(14px, env(safe-area-inset-top)) max(clamp(20px, 2.2vw, 38px), env(safe-area-inset-right)) 4px
+      max(clamp(20px, 2.2vw, 38px), env(safe-area-inset-left));
   }
   .app-header {
     max-width: min(1720px, 95vw);
   }
   .market-main {
     max-width: min(1720px, 95vw);
-    padding: 26px clamp(20px, 2.2vw, 38px) 60px;
+    padding: 26px clamp(20px, 2.2vw, 38px) max(60px, calc(env(safe-area-inset-bottom) + 28px));
   }
   .market-footer-wrap {
     max-width: min(1720px, 95vw);
-    padding: 0 clamp(20px, 2.2vw, 38px) 28px;
+    padding: 0 clamp(20px, 2.2vw, 38px) max(28px, env(safe-area-inset-bottom));
   }
   .legal-wrap {
     max-width: min(1440px, 92vw);
@@ -4764,7 +4826,8 @@
 
 @media (max-width: 1100px) {
   .app-header-wrap {
-    padding: 10px 18px 0;
+    padding: max(10px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0
+      max(18px, env(safe-area-inset-left));
   }
   .header-inner {
     padding: 0 12px 0 16px;
@@ -4781,10 +4844,12 @@
     display: none;
   }
   .market-main {
-    padding: 20px 22px 56px;
+    padding: 20px max(22px, env(safe-area-inset-right)) max(56px, calc(env(safe-area-inset-bottom) + 24px))
+      max(22px, env(safe-area-inset-left));
   }
   .market-footer-wrap {
-    padding: 0 22px 24px;
+    padding: 0 max(22px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+      max(22px, env(safe-area-inset-left));
   }
   .listing-grid,
   .listing-carousel {
@@ -4866,7 +4931,8 @@
 
   /* Full-Pill Rounded, Dynamic, Uncrowded Mobile Title Bar */
   .app-header-wrap {
-    padding: 10px 12px 2px;
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 2px
+      max(12px, env(safe-area-inset-left));
   }
   .app-header {
     border-radius: 999px;
@@ -4915,13 +4981,13 @@
     display: none;
   }
 
-  /* Floating Label-Free Pill Icon Dock (Post Orb Dead Center) */
+  /* Floating Label-Free Pill Icon Dock (Lower-bottom thumb zone, elevated off very bottom edge) */
   .floating-bottom-nav {
     display: block;
     position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(16px, env(safe-area-inset-left));
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));
     z-index: 45;
     pointer-events: none;
   }
@@ -5043,9 +5109,10 @@
     box-shadow: 0 14px 28px oklch(0.565 0.22 269 / 0.52);
   }
 
-  /* Main mobile content + generous clearance for floating dock */
+  /* Main mobile content + generous clearance for elevated floating dock */
   .market-main {
-    padding: 10px 12px 102px;
+    padding: 10px max(12px, env(safe-area-inset-right)) calc(126px + env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
   .market-footer-wrap {
     display: none;
@@ -5224,8 +5291,9 @@
     display: none;
   }
   .auth-main {
-    padding: 16px 12px 32px;
-    min-height: 100svh;
+    padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      calc(32px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    min-height: 100dvh;
     align-items: flex-start;
   }
   .auth-mobile-top {
@@ -5296,7 +5364,8 @@
 /* Ultra-small phones (280px - 359px) */
 @media (max-width: 359px) {
   .app-header-wrap {
-    padding: 6px 8px 0;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0
+      max(8px, env(safe-area-inset-left));
   }
   .header-inner {
     height: 50px;
@@ -5317,7 +5386,8 @@
     gap: 4px;
   }
   .market-main {
-    padding: 10px 8px 100px;
+    padding: 10px max(8px, env(safe-area-inset-right)) calc(120px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
   }
   .surface-panel {
     padding: 12px;
@@ -5370,8 +5440,9 @@
     grid-column: 1 / -1;
   }
   .floating-bottom-nav {
-    left: 8px;
-    right: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px));
   }
   .floating-dock-inner {
     max-width: 296px;
@@ -5392,7 +5463,8 @@
   }
   .onboarding-dialog,
   .mobile-dialog {
-    width: calc(100vw - 16px) !important;
+    width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
+    max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
     border-radius: 24px !important;
     padding: 12px !important;
   }
@@ -5405,6 +5477,26 @@
   }
   .onboarding-title {
     font-size: 19px !important;
+  }
+}
+
+/* Short / Landscape phone viewports */
+@media (max-height: 540px) and (max-width: 960px) {
+  .launch-screen {
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
+    overflow-y: auto;
+    gap: 16px;
+  }
+  .floating-bottom-nav {
+    bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px));
+  }
+  .floating-dock-inner {
+    height: 52px;
+  }
+  .market-main {
+    padding-bottom: calc(102px + env(safe-area-inset-bottom));
   }
 }
 

@@ -9,9 +9,10 @@ declare const Deno: {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
 };
 
 type AdminAction =
@@ -90,7 +91,15 @@ Deno.serve(async (req: Request) => {
     const VALID_LISTING_STATUSES = new Set(["Active", "Paused", "Sold", "Pending", "Rejected"]);
     const VALID_REPORT_STATUSES = new Set(["open", "reviewing", "resolved", "dismissed"]);
 
-    const payload = (await req.json()) as AdminAction;
+    let payload: AdminAction;
+    try {
+      payload = (await req.json()) as AdminAction;
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON request body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (payload.action === "moderate_listing") {
       if (!UUID_REGEX.test(payload.listingId) || !VALID_LISTING_STATUSES.has(payload.status)) {
@@ -231,12 +240,10 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Moderation failed" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    console.error("admin-moderate unhandled error:", err);
+    return new Response(JSON.stringify({ error: "Moderation request failed" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

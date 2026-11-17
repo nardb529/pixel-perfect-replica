@@ -14,7 +14,12 @@ import {
   universities as defaultUniversities,
   type Listing,
 } from "@/lib/campus/data";
-import { isSchemaMissingError, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  isSchemaMissingError,
+  isSupabaseConfigured,
+  resetVisitorSessionId,
+} from "@/lib/supabase/client";
+import { clearAnalyticsSessionCache } from "@/services/analyticsService";
 import type {
   CategoryRecord,
   NotificationPreferences,
@@ -240,7 +245,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     try {
       const { items } = await listingService.searchListings({
         universityFilter: university === "All Universities" ? null : university,
-        limit: 48,
+        limit: 24,
         offset: 0,
       });
       setSchemaReady(true);
@@ -277,6 +282,22 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const activeUserIdRef = useRef<string | null>(null);
+
+  const resetPrivateUserState = useCallback((clearVisitorCaches = false) => {
+    setUserState(null);
+    setMyListings([]);
+    setNotifications([]);
+    setLiked([]);
+    setContacts([]);
+    setSellerPostAuthStage("none");
+    setSaved(favoriteService.getAnonymousFavorites());
+    if (clearVisitorCaches) {
+      clearAnalyticsSessionCache();
+      resetVisitorSessionId();
+    }
+  }, []);
+
   const refreshProfile = useCallback(async (): Promise<CampusUser | null> => {
     if (!isSupabaseConfigured) {
       setAuthLoading(false);
@@ -284,14 +305,21 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     }
     try {
       const session = await authenticationService.getSession();
-      if (!session?.user) {
-        setUserState(null);
-        setMyListings([]);
-        setNotifications([]);
-        setSaved(favoriteService.getAnonymousFavorites());
+      const nextUid = session?.user?.id ?? null;
+
+      if (!nextUid || !session?.user) {
+        const hadPrevUser = activeUserIdRef.current !== null;
+        activeUserIdRef.current = null;
+        resetPrivateUserState(hadPrevUser);
         setAuthLoading(false);
         return null;
       }
+
+      if (activeUserIdRef.current && activeUserIdRef.current !== nextUid) {
+        // Different account signed in on the same device: wipe prior user's transient state
+        resetPrivateUserState(true);
+      }
+      activeUserIdRef.current = nextUid;
 
       const [profile, unis] = await Promise.all([
         profileService.getMyProfile(session.user.id).catch((err) => {
@@ -342,7 +370,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [resetPrivateUserState]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
@@ -405,11 +433,20 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     void Promise.all([refreshMetadata(), refreshProfile()]);
-    const sub = authenticationService.onAuthStateChange((_event, _session) => {
+    const sub = authenticationService.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+      if (event === "SIGNED_OUT") {
+        activeUserIdRef.current = null;
+        resetPrivateUserState(true);
+        setAuthLoading(false);
+        return;
+      }
+      const nextUid = session?.user?.id ?? null;
+      if (event === "TOKEN_REFRESHED" && nextUid === activeUserIdRef.current) return;
       void refreshProfile();
     });
     return () => sub.unsubscribe();
-  }, [refreshMetadata, refreshProfile]);
+  }, [refreshMetadata, refreshProfile, resetPrivateUserState]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -520,11 +557,9 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured) {
       await authenticationService.signOut();
     }
-    setUserState(null);
-    setMyListings([]);
-    setNotifications([]);
-    setSaved(favoriteService.getAnonymousFavorites());
-  }, []);
+    activeUserIdRef.current = null;
+    resetPrivateUserState(true);
+  }, [resetPrivateUserState]);
 
   const selectedUniversityId = useMemo(
     () =>

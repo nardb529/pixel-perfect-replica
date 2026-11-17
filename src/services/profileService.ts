@@ -1,4 +1,9 @@
-import { compressImageFile, getSupabaseClient, requireSupabase } from "@/lib/supabase/client";
+import {
+  compressImageFile,
+  getSessionUser,
+  getSupabaseClient,
+  requireSupabase,
+} from "@/lib/supabase/client";
 import type {
   AccountType,
   AffiliationType,
@@ -6,6 +11,11 @@ import type {
   PublicSellerProfileRecord,
   UserUniversityRecord,
 } from "@/lib/supabase/database.types";
+
+const PROFILE_COLUMNS =
+  "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, role, is_suspended, notification_preferences, created_at, updated_at";
+const PUBLIC_SELLER_COLUMNS =
+  "id, full_name, username, profile_image, bio, account_type, primary_university_id, verification_status, preferred_contact_method, public_contact_handle, is_suspended, created_at";
 
 export interface UpdateProfileInput {
   full_name?: string | undefined;
@@ -27,14 +37,14 @@ export const profileService = {
 
     let targetId = userId;
     if (!targetId) {
-      const { data: userData } = await client.auth.getUser();
-      targetId = userData.user?.id;
+      const sessionUser = await getSessionUser(client);
+      targetId = sessionUser?.id;
     }
     if (!targetId) return null;
 
     const { data, error } = await client
       .from("profiles")
-      .select("*")
+      .select(PROFILE_COLUMNS)
       .eq("id", targetId)
       .maybeSingle();
 
@@ -47,7 +57,7 @@ export const profileService = {
     if (!client) return null;
     const { data, error } = await client
       .from("public_seller_profiles")
-      .select("*")
+      .select(PUBLIC_SELLER_COLUMNS)
       .eq("id", sellerId)
       .maybeSingle();
     if (error) throw error;
@@ -56,11 +66,8 @@ export const profileService = {
 
   async updateMyProfile(input: UpdateProfileInput): Promise<ProfileRecord> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) throw new Error("Authentication required");
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
 
     const sanitized: Record<string, unknown> = {};
     if (input.full_name !== undefined) sanitized["full_name"] = input.full_name.trim().slice(0, 80);
@@ -88,7 +95,7 @@ export const profileService = {
       .from("profiles")
       .update(sanitized)
       .eq("id", user.id)
-      .select("*")
+      .select(PROFILE_COLUMNS)
       .single();
 
     if (error) throw error;
@@ -100,12 +107,14 @@ export const profileService = {
     if (!client) return [];
     const { data, error } = await client
       .from("user_universities")
-      .select("*, university:universities(*)")
+      .select(
+        "id, user_id, university_id, affiliation_type, is_primary, created_at, university:universities(id, university_name, short_name, slug, logo_url, location, region, description, display_order, is_active, created_at)",
+      )
       .eq("user_id", userId)
       .order("is_primary", { ascending: false });
 
     if (error) throw error;
-    return (data || []) as UserUniversityRecord[];
+    return (data || []) as unknown as UserUniversityRecord[];
   },
 
   async saveUserUniversities(
@@ -116,11 +125,8 @@ export const profileService = {
     }>,
   ): Promise<void> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) throw new Error("Authentication required");
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
 
     const { error: deleteErr } = await supabase
       .from("user_universities")
@@ -150,11 +156,8 @@ export const profileService = {
       throw new Error("Profile images must be 5 MB or smaller.");
     }
 
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) throw new Error("Authentication required");
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
 
     const optimized = await compressImageFile(file, 720, 0.85);
     const mimeToExt: Record<string, string> = {
@@ -171,6 +174,7 @@ export const profileService = {
       .upload(path, optimized, {
         upsert: true,
         contentType: optimized.type,
+        cacheControl: "2592000",
       });
 
     if (uploadErr) throw uploadErr;

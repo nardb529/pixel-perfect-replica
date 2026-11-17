@@ -38,7 +38,7 @@ import {
   priceTypes,
   type Listing,
 } from "@/lib/campus/data";
-import { analyticsService, listingService, profileService } from "@/services";
+import { analyticsService, listingService, notificationService, profileService } from "@/services";
 import type {
   AccountType,
   ListingStatus,
@@ -264,12 +264,7 @@ export function DashboardPage() {
       [key]: checked,
     };
     try {
-      const supabase = (await import("@/lib/supabase/client")).requireSupabase();
-      const { error: prefError } = await supabase
-        .from("profiles")
-        .update({ notification_preferences: nextPrefs })
-        .eq("id", user.id);
-      if (prefError) throw prefError;
+      await notificationService.updatePreferences(nextPrefs);
       await refreshProfile();
       toast.success("Notification preferences updated");
     } catch {
@@ -825,6 +820,7 @@ export function PostPage({
     dbUniversities,
     dbCategories,
   } = useCampus();
+  const navigate = useNavigate();
 
   const defaultProductCategory = productCategoryNames[0] ?? "Electronics";
   const defaultServiceCategory = serviceCategoryNames[0] ?? "Graphic Design";
@@ -1444,7 +1440,7 @@ export function PostPage({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => (editId ? setStep(1) : setStep(0))}
+                  onClick={() => (editId ? navigate({ to: "/dashboard" }) : setStep(0))}
                 >
                   <ArrowLeft size={16} />
                   Back

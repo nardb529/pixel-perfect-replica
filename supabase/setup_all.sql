@@ -149,7 +149,8 @@ create index if not exists idx_user_universities_user on public.user_universitie
 create index if not exists idx_user_universities_uni on public.user_universities (university_id);
 
 -- Public profile view: never exposes private email, role, or notification_preferences
-create or replace view public.public_seller_profiles as
+create or replace view public.public_seller_profiles
+with (security_barrier = true) as
 select
   p.id,
   p.full_name,
@@ -230,6 +231,9 @@ create table if not exists public.listings (
 
 create index if not exists idx_listings_browse
   on public.listings (status, listing_type, published_at desc nulls last, created_at desc);
+create index if not exists idx_listings_active_featured_pub
+  on public.listings (is_featured desc, published_at desc nulls last, created_at desc)
+  where status = 'Active';
 create index if not exists idx_listings_seller on public.listings (seller_id, status);
 create index if not exists idx_listings_category on public.listings (category_id, status);
 create index if not exists idx_listings_audience_all on public.listings (audience_scope, status) where audience_scope = 'all';
@@ -294,6 +298,7 @@ create table if not exists public.favorites (
 );
 
 create index if not exists idx_favorites_user on public.favorites (user_id, created_at desc);
+create index if not exists idx_favorites_listing_created on public.favorites (listing_id, created_at desc);
 
 create table if not exists public.listing_likes (
   id uuid primary key default gen_random_uuid(),
@@ -815,7 +820,9 @@ declare
 begin
   select seller_id into v_seller_id
   from public.listings
-  where id = p_listing_id and status = 'Active';
+  where id = p_listing_id
+    and status = 'Active'
+    and (expires_at is null or expires_at > now());
 
   if v_seller_id is null then
     return false;
@@ -869,7 +876,9 @@ declare
 begin
   select seller_id into v_seller_id
   from public.listings
-  where id = p_listing_id and status = 'Active';
+  where id = p_listing_id
+    and status = 'Active'
+    and (expires_at is null or expires_at > now());
 
   if v_seller_id is null then
     return false;
@@ -914,7 +923,12 @@ declare
   v_session text := nullif(trim(p_visitor_session_id), '');
   v_deleted integer := 0;
 begin
-  if not exists (select 1 from public.listings where id = p_listing_id and status = 'Active') then
+  if not exists (
+    select 1 from public.listings
+    where id = p_listing_id
+      and status = 'Active'
+      and (expires_at is null or expires_at > now())
+  ) then
     return false;
   end if;
 
@@ -991,19 +1005,43 @@ begin
 
   select coalesce(jsonb_agg(row_to_json(t)), '[]'::jsonb) into v_top
   from (
+    with seller_listings as (
+      select id, title, listing_type, status, created_at
+      from public.listings
+      where seller_id = v_uid and status <> 'Archived'
+    ),
+    view_counts as (
+      select listing_id, count(*) as cnt
+      from public.listing_views
+      where seller_id = v_uid and viewed_at >= v_since
+      group by listing_id
+    ),
+    click_counts as (
+      select listing_id, count(*) as cnt
+      from public.contact_clicks
+      where seller_id = v_uid and clicked_at >= v_since
+      group by listing_id
+    ),
+    save_counts as (
+      select f.listing_id, count(*) as cnt
+      from public.favorites f
+      join seller_listings sl on sl.id = f.listing_id
+      where f.created_at >= v_since
+      group by f.listing_id
+    )
     select
-      l.id,
-      l.title,
-      l.listing_type,
-      l.status,
-      coalesce((select count(*) from public.listing_views lv where lv.listing_id = l.id and lv.viewed_at >= v_since), 0) as views,
-      coalesce((select count(*) from public.contact_clicks cc where cc.listing_id = l.id and cc.clicked_at >= v_since), 0) as clicks,
-      coalesce((select count(*) from public.favorites f where f.listing_id = l.id and f.created_at >= v_since), 0) as saves
-    from public.listings l
-    where l.seller_id = v_uid and l.status <> 'Archived'
-    order by (coalesce((select count(*) from public.listing_views lv where lv.listing_id = l.id and lv.viewed_at >= v_since), 0)
-      + coalesce((select count(*) from public.contact_clicks cc where cc.listing_id = l.id and cc.clicked_at >= v_since), 0) * 3) desc,
-      l.created_at desc
+      sl.id,
+      sl.title,
+      sl.listing_type,
+      sl.status,
+      coalesce(vc.cnt, 0) as views,
+      coalesce(cc.cnt, 0) as clicks,
+      coalesce(sc.cnt, 0) as saves
+    from seller_listings sl
+    left join view_counts vc on vc.listing_id = sl.id
+    left join click_counts cc on cc.listing_id = sl.id
+    left join save_counts sc on sc.listing_id = sl.id
+    order by (coalesce(vc.cnt, 0) + coalesce(cc.cnt, 0) * 3) desc, sl.created_at desc
     limit 5
   ) t;
 
@@ -1268,21 +1306,10 @@ create policy "Users update own profile"
 grant select on public.public_seller_profiles to anon, authenticated;
 
 drop policy if exists "Public read seller university affiliations" on public.user_universities;
-create policy "Public read seller university affiliations"
+drop policy if exists "Owners and admins view user university affiliations" on public.user_universities;
+create policy "Owners and admins view user university affiliations"
   on public.user_universities for select
-  using (
-    auth.uid() = user_id
-    or public.is_admin()
-    or exists (
-      select 1 from public.profiles p
-      where p.id = user_id
-        and p.is_suspended = false
-        and exists (
-          select 1 from public.listings l
-          where l.seller_id = user_id and l.status = 'Active'
-        )
-    )
-  );
+  using (auth.uid() = user_id or public.is_admin());
 
 drop policy if exists "Users manage own university affiliations" on public.user_universities;
 create policy "Users manage own university affiliations"
@@ -1360,7 +1387,11 @@ create policy "Read images of visible listings"
       select 1 from public.listings l
       where l.id = listing_id
         and (
-          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          (
+            l.status = 'Active'
+            and (l.expires_at is null or l.expires_at > now())
+            and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false)
+          )
           or l.seller_id = auth.uid()
           or public.is_admin()
         )
@@ -1400,7 +1431,11 @@ create policy "Read product_details of visible listings"
       select 1 from public.listings l
       where l.id = listing_id
         and (
-          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          (
+            l.status = 'Active'
+            and (l.expires_at is null or l.expires_at > now())
+            and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false)
+          )
           or l.seller_id = auth.uid()
           or public.is_admin()
         )
@@ -1440,7 +1475,11 @@ create policy "Read service_details of visible listings"
       select 1 from public.listings l
       where l.id = listing_id
         and (
-          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          (
+            l.status = 'Active'
+            and (l.expires_at is null or l.expires_at > now())
+            and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false)
+          )
           or l.seller_id = auth.uid()
           or public.is_admin()
         )
@@ -1480,7 +1519,11 @@ create policy "Read listing_universities of visible listings"
       select 1 from public.listings l
       where l.id = listing_id
         and (
-          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          (
+            l.status = 'Active'
+            and (l.expires_at is null or l.expires_at > now())
+            and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false)
+          )
           or l.seller_id = auth.uid()
           or public.is_admin()
         )

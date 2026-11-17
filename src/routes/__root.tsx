@@ -14,12 +14,13 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CampusProvider } from "@/components/campus/store";
 import { OnboardingPrompts, OfflineBanner } from "@/components/campus/pwa";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="surface-panel max-w-md text-center">
+    <div className="error-boundary-shell">
+      <div className="surface-panel error-boundary-card">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -46,8 +47,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="surface-panel max-w-md text-center">
+    <div className="error-boundary-shell">
+      <div className="surface-panel error-boundary-card">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
@@ -56,6 +57,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
@@ -136,16 +138,23 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <CampusProvider>
-        <OfflineBanner />
-        <Outlet />
-        <OnboardingPrompts />
-        <Toaster />
-      </CampusProvider>
+      <ErrorBoundary
+        onReset={() => {
+          void router.invalidate();
+        }}
+      >
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <CampusProvider>
+          <OfflineBanner />
+          <Outlet />
+          <OnboardingPrompts />
+          <Toaster position="top-center" />
+        </CampusProvider>
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }

@@ -1,4 +1,12 @@
-import { compressImageFile, getSupabaseClient, requireSupabase } from "@/lib/supabase/client";
+import {
+  compressImageFile,
+  getSessionUser,
+  getSupabaseClient,
+  requireSupabase,
+} from "@/lib/supabase/client";
+
+const LISTING_BASE_COLUMNS =
+  "id, seller_id, listing_type, title, slug, description, category_id, price, price_type, currency, status, condition, location, contact_method, contact_value, audience_scope, is_featured, view_count, like_count, favorite_count, contact_click_count, published_at, created_at";
 import type {
   AudienceScope,
   ListingStatus,
@@ -185,7 +193,7 @@ export const listingService = {
       .from("listings")
       .select(
         `
-        *,
+        ${LISTING_BASE_COLUMNS},
         category:categories(id, name, slug),
         images:listing_images(id, image_url, storage_path, display_order),
         product_details(condition, brand, stock_status),
@@ -207,8 +215,8 @@ export const listingService = {
       .maybeSingle();
 
     if (!sellerPublic) {
-      const { data: authData } = await client.auth.getUser();
-      const viewerId = authData.user?.id;
+      const viewer = await getSessionUser(client);
+      const viewerId = viewer?.id;
       let canViewHiddenSeller = viewerId === sellerId;
       if (!canViewHiddenSeller && viewerId) {
         const { data: viewerProfile } = await client
@@ -331,7 +339,7 @@ export const listingService = {
       .from("listings")
       .select(
         `
-        *,
+        ${LISTING_BASE_COLUMNS},
         category:categories(id, name),
         images:listing_images(image_url, display_order),
         targets:listing_universities(university:universities(short_name))
@@ -347,17 +355,14 @@ export const listingService = {
 
   async getMyListings(): Promise<Listing[]> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) return [];
+    const user = await getSessionUser(supabase);
+    if (!user) return [];
 
     const { data, error } = await supabase
       .from("listings")
       .select(
         `
-        *,
+        ${LISTING_BASE_COLUMNS},
         category:categories(id, name),
         images:listing_images(image_url, display_order),
         product_details(condition, brand, stock_status),
@@ -382,11 +387,8 @@ export const listingService = {
 
   async createListing(input: UpsertListingInput): Promise<Listing> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) throw new Error("Sign in to publish listings.");
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Sign in to publish listings.");
 
     const slug = slugifyTitle(input.title);
     const { data: created, error } = await supabase
@@ -472,11 +474,8 @@ export const listingService = {
       throw new Error("Images must be 5 MB or smaller.");
     }
 
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) throw new Error("Sign in to upload images.");
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Sign in to upload images.");
 
     const optimized = await compressImageFile(file, 1400, 0.84);
     const mimeToExt: Record<string, string> = {
@@ -491,6 +490,7 @@ export const listingService = {
     const { error } = await supabase.storage.from("listing-images").upload(storagePath, optimized, {
       upsert: false,
       contentType: optimized.type,
+      cacheControl: "31536000",
     });
 
     if (error) throw error;

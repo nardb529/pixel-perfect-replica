@@ -266,3 +266,45 @@ describe("SQL migrations, RLS, and business-rule integrity", () => {
     }
   });
 });
+
+describe("Security hardening, strict per-user isolation & free-tier SQL optimizations", () => {
+  const setupSql = readFileSync(join(process.cwd(), "supabase/setup_all.sql"), "utf8");
+  const stylesCss = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
+
+  it("isolates private user_universities reads to owners and admins only", () => {
+    expect(setupSql).toContain(
+      'create policy "Owners and admins view user university affiliations"',
+    );
+    expect(setupSql).toContain("using (auth.uid() = user_id or public.is_admin())");
+    expect(setupSql).not.toContain('create policy "Public read seller university affiliations"');
+  });
+
+  it("uses security_barrier view and expiry filters on public listing child tables", () => {
+    expect(setupSql).toContain("with (security_barrier = true) as");
+    const expiryMatches = setupSql.match(/\(l\.expires_at is null or l\.expires_at > now\(\)\)/g);
+    expect(expiryMatches?.length ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("includes partial/composite indexes and CTE aggregation in get_seller_analytics", () => {
+    expect(setupSql).toContain("idx_listings_active_featured_pub");
+    expect(setupSql).toContain("idx_favorites_listing_created");
+    expect(setupSql).toContain("with seller_listings as (");
+  });
+
+  it("sanitizes Edge Function 500 errors and sets no-store caching headers", () => {
+    for (const fn of ["admin-moderate", "contact-track", "upload-sign"]) {
+      const code = readFileSync(join(process.cwd(), `supabase/functions/${fn}/index.ts`), "utf8");
+      expect(code).toContain('"Cache-Control": "no-store"');
+      expect(code).toContain("Invalid JSON request body");
+      expect(code).not.toContain("err instanceof Error ? err.message");
+    }
+  });
+
+  it("adapts viewport safe areas and elevates floating navbar above the very bottom", () => {
+    expect(stylesCss).toContain("bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));");
+    expect(stylesCss).toContain(
+      "padding: 10px max(12px, env(safe-area-inset-right)) calc(126px + env(safe-area-inset-bottom))",
+    );
+    expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
+  });
+});

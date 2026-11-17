@@ -1,4 +1,4 @@
-import { requireSupabase } from "@/lib/supabase/client";
+import { getSessionUser, requireSupabase } from "@/lib/supabase/client";
 import type { ReportReason } from "@/lib/supabase/database.types";
 
 export const reportService = {
@@ -9,9 +9,7 @@ export const reportService = {
     description?: string | undefined;
   }): Promise<void> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser(supabase);
 
     const { error } = await supabase.from("reports").insert({
       reporter_id: user?.id ?? null,

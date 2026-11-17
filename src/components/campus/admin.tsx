@@ -1643,7 +1643,16 @@ export function AdminPage() {
                     <AnimatedSelect
                       ariaLabel="Target audience"
                       value={broadcastScope}
-                      onValueChange={setBroadcastScope}
+                      onValueChange={(nextScope) => {
+                        setBroadcastScope(nextScope);
+                        if (nextScope === "university" && !broadcastUniId && adminUniversities[0]) {
+                          setBroadcastUniId(adminUniversities[0].id);
+                        }
+                        if (nextScope === "single" && !broadcastUserId) {
+                          const firstActive = adminProfiles.find((p) => !p.is_suspended);
+                          if (firstActive) setBroadcastUserId(firstActive.id);
+                        }
+                      }}
                       options={[
                         { value: "all", label: "All active users" },
                         { value: "verified", label: "Verified sellers only" },

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   BadgeCheck,
@@ -67,6 +67,9 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     Boolean(sellerId && backendConfigured),
   );
 
+  const dbUniversitiesRef = useRef(dbUniversities);
+  dbUniversitiesRef.current = dbUniversities;
+
   useEffect(() => {
     if (!sellerId || !backendConfigured) {
       setLoadingSeller(false);
@@ -89,17 +92,18 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
         if (!active) return;
         setRemoteProfile(pub);
         if (pub) {
-          const [sellerItems, uniLinks] = await Promise.all([
-            listingService.getListingsBySeller(pub.id),
-            profileService.listUserUniversities(pub.id),
-          ]);
+          const sellerItems = await listingService.getListingsBySeller(pub.id);
           if (!active) return;
           setRemoteListings(sellerItems);
-          setAffiliations(
-            uniLinks
-              .map((u) => u.university?.short_name || u.university?.university_name || "")
-              .filter(Boolean),
+          const matchedUni = dbUniversitiesRef.current.find(
+            (u) => u.id === pub.primary_university_id,
           );
+          const campusLabel =
+            matchedUni?.short_name ||
+            matchedUni?.university_name ||
+            sellerItems[0]?.university ||
+            "";
+          setAffiliations(campusLabel ? [campusLabel] : []);
         }
       } catch {
         // Fallback to cached listing owner below

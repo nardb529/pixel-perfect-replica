@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 
 const ANON_FAVORITES_KEY = "cl_anon_saved_v1";
 
@@ -28,9 +28,7 @@ export const favoriteService = {
     const client = getSupabaseClient();
     if (!client) return this.getAnonymousFavorites();
 
-    const {
-      data: { user },
-    } = await client.auth.getUser();
+    const user = await getSessionUser(client);
     if (!user) return this.getAnonymousFavorites();
 
     const { data, error } = await client
@@ -45,7 +43,7 @@ export const favoriteService = {
 
   async saveFavorite(listingId: string): Promise<void> {
     const client = getSupabaseClient();
-    const user = client ? (await client.auth.getUser()).data.user : null;
+    const user = client ? await getSessionUser(client) : null;
     if (!client || !user) {
       const current = this.getAnonymousFavorites();
       if (!current.includes(listingId)) {
@@ -62,7 +60,7 @@ export const favoriteService = {
 
   async removeFavorite(listingId: string): Promise<void> {
     const client = getSupabaseClient();
-    const user = client ? (await client.auth.getUser()).data.user : null;
+    const user = client ? await getSessionUser(client) : null;
     if (!client || !user) {
       this.setAnonymousFavorites(this.getAnonymousFavorites().filter((id) => id !== listingId));
       return;

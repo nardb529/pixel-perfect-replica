@@ -1,4 +1,4 @@
-const CACHE_NAME = "campusloop-v4";
+const CACHE_NAME = "campusloop-v5";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.svg",

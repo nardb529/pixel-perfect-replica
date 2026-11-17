@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Smartphone,
@@ -85,7 +85,7 @@ export function DiscoverPage() {
           if (active) setRemoteSuggestions(items);
         })
         .catch(() => undefined);
-    }, 180);
+    }, 300);
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -159,8 +159,13 @@ export function DiscoverPage() {
               key={s.name}
               className={`category-shortcut tone-${s.tone} ${category === s.name && s.name !== "All" ? "selected" : ""}`}
               onClick={() => {
-                if (s.name === "All" && !searching) {
-                  navigate({ to: "/products" });
+                if (s.name === "All") {
+                  if (searching) {
+                    setQuery("");
+                    setCategory("All");
+                  } else {
+                    navigate({ to: "/products" });
+                  }
                   return;
                 }
                 setCategory(s.name === category ? "All" : s.name);
@@ -369,17 +374,25 @@ export function BrowsePage({
     if (initialQuery !== undefined) setQuery(initialQuery || "");
   }, [initialQuery]);
 
-  // Reset pagination whenever filters change
-  useEffect(() => {
-    setOffset(0);
-    setLocalVisibleCount(PAGE_SIZE);
-  }, [university, query, type, category, maxPrice, sort]);
+  const filterSignature = `${university}|${query}|${type}|${category}|${maxPrice}|${sort}`;
+  const prevFilterSigRef = useRef<string>(filterSignature);
 
   useEffect(() => {
+    const filterChanged = prevFilterSigRef.current !== filterSignature;
+    if (filterChanged) {
+      prevFilterSigRef.current = filterSignature;
+      setLocalVisibleCount(PAGE_SIZE);
+      if (offset !== 0) {
+        setOffset(0);
+        return;
+      }
+    }
+
     if (!backendConfigured || !schemaReady) return;
     let active = true;
     setDbLoading(true);
     setDbSearchFailed(false);
+    const effectiveOffset = filterChanged ? 0 : offset;
     const sortParam =
       sort === "low"
         ? "price_asc"
@@ -401,11 +414,11 @@ export function BrowsePage({
           maxPrice: maxPrice === "any" ? null : Number(maxPrice),
           sort: sortParam,
           limit: PAGE_SIZE,
-          offset,
+          offset: effectiveOffset,
         })
         .then(({ items, totalCount }) => {
           if (!active) return;
-          setDbResults((prev) => (offset === 0 ? items : [...prev, ...items]));
+          setDbResults((prev) => (effectiveOffset === 0 ? items : [...prev, ...items]));
           setDbTotal(totalCount);
           setDbLoading(false);
         })
@@ -414,13 +427,24 @@ export function BrowsePage({
           setDbSearchFailed(true);
           setDbLoading(false);
         });
-    }, 120);
+    }, 260);
 
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [backendConfigured, schemaReady, university, query, type, category, maxPrice, sort, offset]);
+  }, [
+    backendConfigured,
+    schemaReady,
+    university,
+    query,
+    type,
+    category,
+    maxPrice,
+    sort,
+    offset,
+    filterSignature,
+  ]);
 
   const localResults = useMemo(
     () =>

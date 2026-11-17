@@ -1,4 +1,6 @@
-import { compressImageFile, requireSupabase } from "@/lib/supabase/client";
+import { compressImageFile, getSessionUser, requireSupabase } from "@/lib/supabase/client";
+import { invalidateCategoryCache } from "@/services/categoryService";
+import { invalidateUniversityCache } from "@/services/universityService";
 import type {
   AdminDashboardSummary,
   CategoryRecord,
@@ -43,9 +45,7 @@ export type ModerationLogRecord = {
 
 async function writeAuditLog(action: string, targetType: string, targetId: string, notes?: string) {
   const supabase = requireSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return;
   const { error } = await supabase.from("moderation_logs").insert({
     admin_id: user.id,
@@ -84,7 +84,9 @@ export const adminService = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from("profiles")
-      .select("*")
+      .select(
+        "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, role, is_suspended, notification_preferences, created_at, updated_at",
+      )
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -95,7 +97,9 @@ export const adminService = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from("reports")
-      .select("*")
+      .select(
+        "id, reporter_id, listing_id, reported_user_id, reason, description, status, reviewed_by, reviewed_at, moderation_note, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(120);
     if (error) throw error;
@@ -106,7 +110,7 @@ export const adminService = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from("moderation_logs")
-      .select("*")
+      .select("id, admin_id, action, target_type, target_id, notes, created_at")
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -191,9 +195,7 @@ export const adminService = {
 
   async updateUserRole(userId: string, role: UserRole): Promise<void> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser(supabase);
     if (user?.id === userId) {
       throw new Error("Administrators cannot change their own role.");
     }
@@ -235,9 +237,7 @@ export const adminService = {
     const { error } = await supabase.from("notifications").insert(rows);
     if (error) throw error;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser(supabase);
     if (user) {
       await writeAuditLog(
         "platform_broadcast",
@@ -251,9 +251,7 @@ export const adminService = {
 
   async resolveReport(reportId: string, status: ReportStatus, note?: string): Promise<void> {
     const supabase = requireSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser(supabase);
     const { error } = await supabase
       .from("reports")
       .update({
@@ -295,9 +293,12 @@ export const adminService = {
     const { data, error } = await supabase
       .from("universities")
       .upsert(payload)
-      .select("*")
+      .select(
+        "id, university_name, short_name, slug, logo_url, location, region, description, display_order, is_active, created_at",
+      )
       .single();
     if (error) throw error;
+    invalidateUniversityCache();
     await writeAuditLog(
       "university_saved",
       "university",
@@ -314,6 +315,7 @@ export const adminService = {
       .update({ is_active: isActive })
       .eq("id", id);
     if (error) throw error;
+    invalidateUniversityCache();
     await writeAuditLog(isActive ? "university_enabled" : "university_disabled", "university", id);
   },
 
@@ -340,9 +342,11 @@ export const adminService = {
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "") || "campus";
     const path = `${safeSlug}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("university-logos")
-      .upload(path, optimized, { upsert: true, contentType: optimized.type });
+    const { error } = await supabase.storage.from("university-logos").upload(path, optimized, {
+      upsert: true,
+      contentType: optimized.type,
+      cacheControl: "2592000",
+    });
     if (error) throw error;
     const { data } = supabase.storage.from("university-logos").getPublicUrl(path);
     return data.publicUrl;
@@ -371,9 +375,12 @@ export const adminService = {
         display_order: input.display_order ?? 50,
         is_active: input.is_active ?? true,
       })
-      .select("*")
+      .select(
+        "id, name, slug, category_type, icon, description, display_order, is_active, created_at",
+      )
       .single();
     if (error) throw error;
+    invalidateCategoryCache();
     await writeAuditLog("category_saved", "category", (data as CategoryRecord).id, input.name);
     return data as CategoryRecord;
   },
@@ -385,6 +392,7 @@ export const adminService = {
       .update({ is_active: isActive })
       .eq("id", id);
     if (error) throw error;
+    invalidateCategoryCache();
     await writeAuditLog(isActive ? "category_shown" : "category_hidden", "category", id);
   },
 
@@ -392,7 +400,9 @@ export const adminService = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from("promotion_configs")
-      .select("*")
+      .select(
+        "id, plan_key, name, description, target_scope, duration_days, suggested_fee_ghs, is_active, created_at, updated_at",
+      )
       .order("duration_days", { ascending: true });
     if (error) throw error;
     return (data || []) as PromotionConfigRecord[];

@@ -58,6 +58,8 @@ export function DetailPage({ id }: { id: string }) {
   const [reportDescription, setReportDescription] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
   const viewedId = useRef<string | null>(null);
+  const hasCachedRef = useRef<boolean>(Boolean(cachedListing));
+  hasCachedRef.current = Boolean(cachedListing);
 
   useEffect(() => {
     let active = true;
@@ -65,7 +67,7 @@ export function DetailPage({ id }: { id: string }) {
     setFetchedListing(null);
 
     if (backendConfigured) {
-      if (!cachedListing) setLoading(true);
+      if (!hasCachedRef.current) setLoading(true);
       void listingService
         .getListingById(id)
         .then((res) => {
@@ -87,7 +89,7 @@ export function DetailPage({ id }: { id: string }) {
     return () => {
       active = false;
     };
-  }, [id, backendConfigured, cachedListing, recordView]);
+  }, [id, backendConfigured, recordView]);
 
   const listing = fetchedListing || cachedListing;
 
@@ -172,6 +174,7 @@ export function DetailPage({ id }: { id: string }) {
             <div className="detail-thumbs">
               {images.map((im, i) => (
                 <Button
+                  type="button"
                   key={i}
                   variant={imageIndex === i ? "default" : "outline"}
                   aria-label={`View image ${i + 1}`}

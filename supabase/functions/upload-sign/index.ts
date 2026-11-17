@@ -9,9 +9,10 @@ declare const Deno: {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
 };
 
 const ALLOWED_BUCKETS = new Set(["listing-images", "profile-images", "university-logos"]);
@@ -79,12 +80,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const body = (await req.json()) as {
+    let body: {
       bucket?: string;
       mimeType?: string;
       fileSize?: number;
       extension?: string;
     };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON request body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const bucket = body.bucket || "listing-images";
     const mimeType = body.mimeType || "";
@@ -147,7 +156,8 @@ Deno.serve(async (req: Request) => {
       .createSignedUploadUrl(objectPath);
 
     if (error || !data) {
-      return new Response(JSON.stringify({ error: error?.message || "Failed to sign upload" }), {
+      console.error("upload-sign createSignedUploadUrl error:", error);
+      return new Response(JSON.stringify({ error: "Failed to prepare image upload" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -168,12 +178,10 @@ Deno.serve(async (req: Request) => {
       },
     );
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Upload sign error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    console.error("upload-sign unhandled error:", err);
+    return new Response(JSON.stringify({ error: "Upload preparation failed" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

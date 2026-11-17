@@ -31,6 +31,8 @@ vi.mock("@tanstack/react-router", async () => {
 import { AdminPage } from "@/components/campus/admin";
 import { AuthPage } from "@/components/campus/auth";
 import { DiscoverPage } from "@/components/campus/discovery";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { analyticsService, clearAnalyticsSessionCache } from "@/services/analyticsService";
 
 const productFixture: Listing = {
   id: "prod-1",
@@ -144,6 +146,22 @@ describe("Commercial marketplace & fail-closed security gates", () => {
     expect(screen.getByText(/No listings in .* yet/i)).toBeInTheDocument();
   });
 
+  it("clears active search query when clicking the 'All items' category shortcut", () => {
+    render(
+      <CampusProvider>
+        <DiscoverPage />
+      </CampusProvider>,
+    );
+
+    const input = screen.getByPlaceholderText(/Search products, services, sellers/i);
+    fireEvent.change(input, { target: { value: "laptop" } });
+    expect(screen.getByText("0 results")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "All items" }));
+    expect(input).toHaveValue("");
+    expect(screen.getByText("Just dropped")).toBeInTheDocument();
+  });
+
   it("disables authentication submission when backend credentials are unavailable", () => {
     render(
       <CampusProvider>
@@ -170,5 +188,40 @@ describe("Commercial marketplace & fail-closed security gates", () => {
     expect(
       screen.queryByRole("heading", { name: "Platform Administration" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Global ErrorBoundary & free-tier analytics cache", () => {
+  it("catches render errors and recovers cleanly when Try again is clicked", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let shouldThrow = true;
+
+    function FlakyChild() {
+      if (shouldThrow) {
+        throw new Error("Simulated render crash");
+      }
+      return <div>Recovered marketplace view</div>;
+    }
+
+    render(
+      <ErrorBoundary>
+        <FlakyChild />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Something unexpected happened")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reload page/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Go to Discover/i })).toBeInTheDocument();
+
+    shouldThrow = false;
+    fireEvent.click(screen.getByRole("button", { name: /Try again/i }));
+    expect(screen.getByText("Recovered marketplace view")).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
+  it("safely returns false for recordView when backend is unconfigured and clears session cache", async () => {
+    clearAnalyticsSessionCache();
+    expect(await analyticsService.recordView("listing-123")).toBe(false);
   });
 });
