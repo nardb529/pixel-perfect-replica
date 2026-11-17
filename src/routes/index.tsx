@@ -1,15 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BookOpen, Camera, Laptop, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
 import { BRAND } from "@/lib/campus/data";
 import { pageHead } from "@/lib/campus/meta";
-import laptop from "@/assets/laptop.jpg";
-import sneakers from "@/assets/sneakers.jpg";
-import photographer from "@/assets/photographer.jpg";
-import headphones from "@/assets/headphones.jpg";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -20,42 +16,15 @@ export const Route = createFileRoute("/")({
   component: Welcome,
 });
 
-type LaunchPhase = "splash" | "exiting" | "ready";
-
 function Welcome() {
   const { triggerBuyerInstallPrompt } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
-  const [phase, setPhase] = useState<LaunchPhase>("splash");
 
   useEffect(() => {
     void router.preloadRoute({ to: "/discover" }).catch(() => undefined);
     void router.preloadRoute({ to: "/auth" }).catch(() => undefined);
-
-    const reduced =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const holdMs = reduced ? 350 : 950;
-    const exitMs = reduced ? 100 : 220;
-
-    let exitTimer: number | undefined;
-    const holdTimer = window.setTimeout(() => {
-      setPhase("exiting");
-      exitTimer = window.setTimeout(() => setPhase("ready"), exitMs);
-    }, holdMs);
-
-    return () => {
-      window.clearTimeout(holdTimer);
-      if (exitTimer !== undefined) window.clearTimeout(exitTimer);
-    };
   }, [router]);
-
-  function skipSplash() {
-    if (phase !== "splash") return;
-    setPhase("exiting");
-    window.setTimeout(() => setPhase("ready"), 180);
-  }
 
   function handleExplore() {
     triggerBuyerInstallPrompt();
@@ -97,100 +66,53 @@ function Welcome() {
         </svg>
       </div>
 
-      {phase !== "ready" ? (
-        <div
-          className={`splash-intro ${phase === "exiting" ? "is-exiting" : ""}`}
-          onClick={skipSplash}
-          role="button"
-          tabIndex={0}
-          aria-label={`${BRAND} launching`}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") skipSplash();
-          }}
-        >
-          <h1 className="sr-only">{BRAND}</h1>
+      <div className="launch-topbar">
+        <ThemeToggle />
+      </div>
 
-          <div className="launch-orbital" aria-hidden="true">
-            <figure className="launch-tile launch-tile-a">
-              <img src={sneakers} alt="" width={400} height={400} decoding="async" />
-            </figure>
-            <figure className="launch-tile launch-tile-b">
-              <img src={headphones} alt="" width={400} height={400} decoding="async" />
-            </figure>
-            <figure className="launch-tile launch-tile-c">
-              <img src={photographer} alt="" width={400} height={400} decoding="async" />
-            </figure>
-            <figure className="launch-tile launch-tile-d">
-              <img src={laptop} alt="" width={400} height={400} decoding="async" />
-            </figure>
+      <div className="launch-stage">
+        <div className="launch-orbital" aria-hidden="true">
+          <div className="launch-tile launch-tile-icon launch-tile-a">
+            <ShoppingBag size={36} strokeWidth={1.7} />
           </div>
-
-          <div className="splash-center">
-            <span className="splash-aura" aria-hidden="true" />
-            <span className="splash-ring-outer" aria-hidden="true" />
-            <span className="splash-ring-inner" aria-hidden="true" />
-            <span className="splash-sonar" aria-hidden="true" />
-            <div className="splash-emblem-core">
-              <BrandMark size={84} animated />
-            </div>
-            <div className="splash-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
+          <div className="launch-tile launch-tile-icon launch-tile-b">
+            <BookOpen size={36} strokeWidth={1.7} />
+          </div>
+          <div className="launch-tile launch-tile-icon launch-tile-c">
+            <Camera size={36} strokeWidth={1.7} />
+          </div>
+          <div className="launch-tile launch-tile-icon launch-tile-d">
+            <Laptop size={36} strokeWidth={1.7} />
           </div>
         </div>
-      ) : (
-        <>
-          <div className="launch-topbar">
-            <ThemeToggle />
-          </div>
 
-          <div className="launch-stage">
-            <div className="launch-orbital" aria-hidden="true">
-              <figure className="launch-tile launch-tile-a">
-                <img src={sneakers} alt="" width={400} height={400} />
-              </figure>
-              <figure className="launch-tile launch-tile-b">
-                <img src={headphones} alt="" width={400} height={400} />
-              </figure>
-              <figure className="launch-tile launch-tile-c">
-                <img src={photographer} alt="" width={400} height={400} />
-              </figure>
-              <figure className="launch-tile launch-tile-d">
-                <img src={laptop} alt="" width={400} height={400} />
-              </figure>
-            </div>
-
-            <div className="launch-center-card">
-              <div className="launch-emblem">
-                <BrandMark size={64} animated />
-              </div>
-              <h1 className="launch-wordmark">
-                {BRAND}
-                <span>.</span>
-              </h1>
-              <p className="launch-tagline">Your campus. Your loop.</p>
-            </div>
+        <div className="launch-center-card">
+          <div className="launch-emblem">
+            <BrandMark size={64} animated />
           </div>
+          <h1 className="launch-wordmark">
+            {BRAND}
+            <span>.</span>
+          </h1>
+          <p className="launch-tagline">Your campus. Your loop.</p>
+        </div>
+      </div>
 
-          <div className="launch-dock">
-            <Button size="lg" className="launch-primary" onClick={handleExplore}>
-              Explore Marketplace
-              <ArrowRight size={18} />
-            </Button>
-            <Button variant="outline" size="lg" className="launch-secondary" asChild>
-              <Link to="/auth">
-                Sell or Offer a Service
-                <ArrowUpRight size={17} />
-              </Link>
-            </Button>
-            <div className="launch-hint-pill">
-              <span>Browse freely without an account</span>
-            </div>
-          </div>
-        </>
-      )}
+      <div className="launch-dock">
+        <Button size="lg" className="launch-primary" onClick={handleExplore}>
+          Explore Marketplace
+          <ArrowRight size={18} />
+        </Button>
+        <Button variant="outline" size="lg" className="launch-secondary" asChild>
+          <Link to="/auth">
+            Sell or Offer a Service
+            <ArrowUpRight size={17} />
+          </Link>
+        </Button>
+        <div className="launch-hint-pill">
+          <span>Browse freely without an account</span>
+        </div>
+      </div>
     </div>
   );
 }

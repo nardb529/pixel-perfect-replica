@@ -84,11 +84,12 @@ export function PrivacyPage() {
               <span className="legal-icon">
                 <Lock size={18} />
               </span>
-              <h2>4. Photos &amp; local preview</h2>
+              <h2>4. Media storage &amp; deletion</h2>
             </div>
             <p>
-              Listing photos and profile avatars uploaded in this interactive prototype stay inside
-              your browser session and are never sold to third-party advertisers.
+              Listing photos and profile avatars are securely hosted for public marketplace display.
+              You can replace or archive your listings and media anytime from your dashboard, and we
+              never sell your data to third-party advertisers.
             </p>
           </article>
         </div>

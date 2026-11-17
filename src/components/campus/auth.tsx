@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Eye, EyeOff, MailCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, MailCheck, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -9,7 +9,6 @@ import { useCampus } from "./store";
 import { BRAND, validatePassword } from "@/lib/campus/data";
 import { authenticationService } from "@/services";
 import type { AccountType } from "@/lib/supabase/database.types";
-import laptop from "@/assets/laptop.jpg";
 
 export function AuthPage() {
   const [mode, setMode] = useState<"signup" | "login">("signup");
@@ -25,9 +24,6 @@ export function AuthPage() {
     backendConfigured,
     universityNames,
     dbUniversities,
-    setUser,
-    registerAccount,
-    rememberedAccounts,
     refreshProfile,
     triggerSellerPostAuth,
   } = useCampus();
@@ -61,32 +57,9 @@ export function AuthPage() {
     const whatsapp = String(data.get("whatsapp") || "").trim();
 
     if (!backendConfigured) {
-      if (mode === "signup") {
-        registerAccount({
-          name: fullName,
-          username: fallbackUsername,
-          email,
-          university: chosenUniName,
-          capability: chosenCapability,
-          bio: "",
-          contact: "WhatsApp",
-          contactDetails: whatsapp || undefined,
-        });
-      } else {
-        const remembered = rememberedAccounts[email];
-        setUser(
-          remembered || {
-            name: "Campus Seller",
-            email,
-            university: universityNames[0] || "KNUST",
-            capability: "Both",
-            bio: "",
-            contact: "WhatsApp",
-          },
-        );
-      }
-      triggerSellerPostAuth();
-      navigate({ to: "/dashboard" });
+      setError(
+        "Authentication service is currently unavailable. Please configure your Supabase credentials to sign in or register.",
+      );
       return;
     }
 
@@ -143,7 +116,7 @@ export function AuthPage() {
     e.preventDefault();
     if (!forgotEmail.trim()) return;
     if (!backendConfigured) {
-      setSent(true);
+      toast.error("Password reset is unavailable until Supabase Auth is configured.");
       return;
     }
     try {
@@ -164,14 +137,21 @@ export function AuthPage() {
         <div className="auth-aside-copy surface-panel curve-accent">
           <h2>Reach students on your campus.</h2>
           <p>List products or offer services to students across your university community.</p>
+          <ul className="auth-aside-points">
+            <li>
+              <CheckCircle2 size={16} />
+              <span>Verified campus marketplace profiles</span>
+            </li>
+            <li>
+              <CheckCircle2 size={16} />
+              <span>Direct WhatsApp &amp; phone enquiries</span>
+            </li>
+            <li>
+              <ShieldCheck size={16} />
+              <span>Zero middleman fees or payment delays</span>
+            </li>
+          </ul>
         </div>
-        <img
-          src={laptop}
-          alt="Laptop listed for campus buyers"
-          decoding="async"
-          width={1024}
-          height={1024}
-        />
       </aside>
 
       <main className="auth-main">
@@ -376,7 +356,11 @@ export function AuthPage() {
                   </p>
                 )}
 
-                <Button className="auth-submit" type="submit" disabled={submitting}>
+                <Button
+                  className="auth-submit"
+                  type="submit"
+                  disabled={submitting || !backendConfigured}
+                >
                   {submitting ? "Please wait..." : mode === "signup" ? "Create account" : "Sign in"}
                   <ArrowRight size={16} />
                 </Button>
@@ -385,7 +369,7 @@ export function AuthPage() {
               <p className="auth-footnote">
                 {backendConfigured
                   ? "Protected by CampusLoop Auth — by continuing you agree to our "
-                  : "Local preview mode (connect Supabase env vars for live accounts) — "}
+                  : "Supabase connection required for sign in and registration — "}
                 <Link to="/terms">Terms</Link> &amp; <Link to="/privacy">Privacy Policy</Link>.
               </p>
 
@@ -402,9 +386,7 @@ export function AuthPage() {
           <DialogTitle>{sent ? "Check your email" : "Reset your password"}</DialogTitle>
           <DialogDescription>
             {sent
-              ? backendConfigured
-                ? `If an account exists for ${forgotEmail}, a reset link has been sent.`
-                : "Password reset delivery activates once Supabase SMTP/Auth credentials are configured."
+              ? `If an account exists for ${forgotEmail}, a reset link has been sent.`
               : `Enter your ${BRAND} account email address.`}
           </DialogDescription>
           {!sent && (

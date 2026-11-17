@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Logo, ThemeToggle } from "@/components/campus/shared";
@@ -26,6 +26,40 @@ function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(backendConfigured);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
+
+  useEffect(() => {
+    if (!backendConfigured) {
+      setCheckingSession(false);
+      setHasRecoverySession(false);
+      return;
+    }
+
+    let active = true;
+    void authenticationService
+      .getSession()
+      .then((session) => {
+        if (!active) return;
+        setHasRecoverySession(Boolean(session?.user));
+      })
+      .finally(() => {
+        if (active) setCheckingSession(false);
+      });
+
+    const sub = authenticationService.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === "PASSWORD_RECOVERY" || Boolean(session?.user)) {
+        setHasRecoverySession(true);
+        setCheckingSession(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      sub.unsubscribe();
+    };
+  }, [backendConfigured]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -34,8 +68,8 @@ function ResetPasswordPage() {
       setError(validation);
       return;
     }
-    if (!backendConfigured) {
-      setError("Connect Supabase environment variables to complete password recovery.");
+    if (!backendConfigured || !hasRecoverySession) {
+      setError("Open the password reset link sent to your email before changing your password.");
       return;
     }
 
@@ -71,6 +105,25 @@ function ResetPasswordPage() {
               <Button onClick={() => navigate({ to: "/dashboard" })}>
                 Go to Dashboard
                 <ArrowRight size={16} />
+              </Button>
+            </div>
+          ) : checkingSession ? (
+            <div className="modal-body">
+              <h1>Verifying reset link</h1>
+              <p>Checking your secure recovery session...</p>
+            </div>
+          ) : !backendConfigured || !hasRecoverySession ? (
+            <div className="modal-body">
+              <span className="success-icon">
+                <ShieldAlert size={30} />
+              </span>
+              <h1>Reset link required</h1>
+              <p>
+                Open the password reset link sent to your email to continue, or request a fresh one
+                from the Sign In screen.
+              </p>
+              <Button asChild>
+                <Link to="/auth">Back to Sign In</Link>
               </Button>
             </div>
           ) : (

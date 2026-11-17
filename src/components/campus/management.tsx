@@ -14,7 +14,6 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-  Heart,
   Bell,
   TrendingUp,
   Shield,
@@ -37,7 +36,6 @@ import {
   validateListing,
   formatListingPrice,
   priceTypes,
-  sampleImages,
   type Listing,
 } from "@/lib/campus/data";
 import { analyticsService, listingService, profileService } from "@/services";
@@ -72,22 +70,16 @@ export function DashboardPage() {
     backendConfigured,
     authLoading,
     user,
-    listings,
     myListings,
-    setListings,
     refreshMyListings,
     refreshListings,
     refreshProfile,
-    saved,
-    contacts,
-    activities,
     notifications,
     unreadNotificationCount,
     markNotificationRead,
     markAllNotificationsRead,
     universityNames,
     dbUniversities,
-    setUser,
     signOutUser,
   } = useCampus();
 
@@ -136,23 +128,16 @@ export function DashboardPage() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  const mine = backendConfigured
-    ? myListings
-    : listings.filter((l) => ownsListing(l, user.email) || ownsListing(l, user.id));
-  const myIds = new Set(mine.map((l) => l.id));
-  const localContactCount = contacts.filter((id) => myIds.has(id)).length;
-  const localSavedCount = saved.filter((id) => myIds.has(id)).length;
-  const myActivities = activities.filter((a) => myIds.has(a.listingId));
+  const isSuspended = Boolean(user.isSuspended);
+  const mine = backendConfigured ? myListings : [];
 
   const activeCount =
     analytics?.active_listings ?? mine.filter((l) => l.status === "Active").length;
   const viewCount = analytics?.total_views ?? mine.reduce((s, l) => s + l.views, 0);
   const clickCount =
-    analytics?.contact_clicks ??
-    (backendConfigured ? mine.reduce((s, l) => s + (l.contactClicks || 0), 0) : localContactCount);
+    analytics?.contact_clicks ?? mine.reduce((s, l) => s + (l.contactClicks || 0), 0);
   const favCount =
-    analytics?.saved_listings ??
-    (backendConfigured ? mine.reduce((s, l) => s + (l.favoriteCount || 0), 0) : localSavedCount);
+    analytics?.saved_listings ?? mine.reduce((s, l) => s + (l.favoriteCount || 0), 0);
 
   const topListings = analytics?.top_listings?.length
     ? analytics.top_listings
@@ -173,29 +158,16 @@ export function DashboardPage() {
   async function updateSettings(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!user) return;
+    if (!backendConfigured) {
+      toast.error("Live service is currently unavailable. Please try again shortly.");
+      return;
+    }
+
     const data = new FormData(e.currentTarget);
     const nextUni = String(data.get("university") || user.university);
     const nextCapability = String(data.get("capability") || user.capability) as AccountType;
     const nextContact = String(data.get("contact") || user.contact);
     const nextContactDetails = String(data.get("contactDetails") || "").trim();
-
-    if (!backendConfigured) {
-      const updated = {
-        ...user,
-        university: nextUni,
-        capability: nextCapability,
-        contact: nextContact,
-        contactDetails: nextContactDetails || undefined,
-      };
-      setUser(updated);
-      setListings((prev) =>
-        prev.map((l) =>
-          ownsListing(l, user.email) ? { ...l, university: updated.university } : l,
-        ),
-      );
-      toast.success("Settings saved");
-      return;
-    }
 
     setSavingSettings(true);
     try {
@@ -243,40 +215,37 @@ export function DashboardPage() {
   }
 
   async function handleStatusChange(listing: Listing, nextStatus: Listing["status"]) {
-    const previous = listing.status;
-    setListings((prev) =>
-      prev.map((item) => (item.id === listing.id ? { ...item, status: nextStatus } : item)),
-    );
-
-    if (backendConfigured) {
-      try {
-        await listingService.updateListingStatus(listing.id, nextStatus as ListingStatus);
-        await Promise.all([refreshMyListings(), refreshListings()]);
-      } catch (err) {
-        setListings((prev) =>
-          prev.map((item) => (item.id === listing.id ? { ...item, status: previous } : item)),
-        );
-        toast.error(err instanceof Error ? err.message : "Failed to update listing status");
-        return;
-      }
+    if (!backendConfigured) {
+      toast.error("Live service is currently unavailable. Please try again shortly.");
+      return;
     }
-    toast.success(`${listing.title} marked as ${nextStatus}`);
+    if (isSuspended && nextStatus === "Active") {
+      toast.error("Suspended accounts cannot reactivate listings.");
+      return;
+    }
+
+    try {
+      await listingService.updateListingStatus(listing.id, nextStatus as ListingStatus);
+      await Promise.all([refreshMyListings(), refreshListings()]);
+      toast.success(`${listing.title} marked as ${nextStatus}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update listing status");
+    }
   }
 
   async function handleDeleteListing(target: Listing) {
-    if (backendConfigured) {
-      try {
-        await listingService.archiveListing(target.id);
-        await Promise.all([refreshMyListings(), refreshListings()]);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not delete listing");
-        return;
-      }
-    } else {
-      setListings((prev) => prev.filter((l) => l.id !== target.id));
+    if (!backendConfigured) {
+      toast.error("Live service is currently unavailable. Please try again shortly.");
+      return;
     }
-    setDeleting(null);
-    toast.success("Listing removed");
+    try {
+      await listingService.archiveListing(target.id);
+      await Promise.all([refreshMyListings(), refreshListings()]);
+      setDeleting(null);
+      toast.success("Listing removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete listing");
+    }
   }
 
   async function toggleNotificationPref(
@@ -284,24 +253,27 @@ export function DashboardPage() {
     checked: boolean,
   ) {
     if (!user) return;
+    if (!backendConfigured) {
+      toast.error("Live service is currently unavailable. Please try again shortly.");
+      return;
+    }
     const nextPrefs = {
       listing_updates: user.notificationPreferences?.listing_updates ?? true,
       enquiries: user.notificationPreferences?.enquiries ?? true,
       announcements: user.notificationPreferences?.announcements ?? true,
       [key]: checked,
     };
-    setUser({ ...user, notificationPreferences: nextPrefs });
-    if (backendConfigured) {
-      try {
-        const supabase = (await import("@/lib/supabase/client")).requireSupabase();
-        await supabase
-          .from("profiles")
-          .update({ notification_preferences: nextPrefs })
-          .eq("id", user.id);
-        toast.success("Notification preferences updated");
-      } catch {
-        toast.error("Could not update notification preferences");
-      }
+    try {
+      const supabase = (await import("@/lib/supabase/client")).requireSupabase();
+      const { error: prefError } = await supabase
+        .from("profiles")
+        .update({ notification_preferences: nextPrefs })
+        .eq("id", user.id);
+      if (prefError) throw prefError;
+      await refreshProfile();
+      toast.success("Notification preferences updated");
+    } catch {
+      toast.error("Could not update notification preferences");
     }
   }
 
@@ -317,7 +289,7 @@ export function DashboardPage() {
             text="Manage your products, services, performance and enquiries."
           />
           <div className="flex flex-wrap items-center gap-2">
-            {user.role === "admin" && (
+            {user.role === "admin" && !isSuspended && (
               <Button variant="outline" className="admin-launch-btn" asChild>
                 <Link to="/admin">
                   <Shield size={15} />
@@ -325,12 +297,14 @@ export function DashboardPage() {
                 </Link>
               </Button>
             )}
-            <Button className="dashboard-create-btn" asChild>
-              <Link to="/post">
-                <Plus size={16} />
-                Create listing
-              </Link>
-            </Button>
+            {!isSuspended && (
+              <Button className="dashboard-create-btn" asChild>
+                <Link to="/post">
+                  <Plus size={16} />
+                  Create listing
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -347,9 +321,11 @@ export function DashboardPage() {
             <Bell size={15} />
             Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
           </Button>
-          <Button variant="ghost" asChild>
-            <Link to="/post">Create Listing</Link>
-          </Button>
+          {!isSuspended && (
+            <Button variant="ghost" asChild>
+              <Link to="/post">Create Listing</Link>
+            </Button>
+          )}
           <Button variant="ghost" asChild>
             <Link to="/profile">Profile</Link>
           </Button>
@@ -361,6 +337,16 @@ export function DashboardPage() {
           </Button>
         </div>
       </section>
+
+      {isSuspended && (
+        <section className="surface-panel section-panel" role="alert">
+          <SectionTitle eyebrow="Account status" title="Your seller account is suspended" />
+          <p className="profile-bio">
+            Posting new listings and reactivating listings is disabled while your account is
+            suspended. Contact CampusLoop support if you believe this is an error.
+          </p>
+        </section>
+      )}
 
       {tab === "Settings" ? (
         <section className="surface-panel section-panel">
@@ -603,24 +589,26 @@ export function DashboardPage() {
                 </div>
               )}
 
-              <div className="quick-actions">
-                <Button variant="outline" asChild>
-                  <Link to="/post" search={{ type: "product" }}>
-                    <ShoppingBag size={16} />
-                    Post a Product
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/post" search={{ type: "service" }}>
-                    <Briefcase size={16} />
-                    Offer a Service
-                  </Link>
-                </Button>
-                <Button variant="ghost" onClick={() => setTab("My Listings")}>
-                  Manage Listings
-                  <ArrowRight size={15} />
-                </Button>
-              </div>
+              {!isSuspended && (
+                <div className="quick-actions">
+                  <Button variant="outline" asChild>
+                    <Link to="/post" search={{ type: "product" }}>
+                      <ShoppingBag size={16} />
+                      Post a Product
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/post" search={{ type: "service" }}>
+                      <Briefcase size={16} />
+                      Offer a Service
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" onClick={() => setTab("My Listings")}>
+                    Manage Listings
+                    <ArrowRight size={15} />
+                  </Button>
+                </div>
+              )}
             </section>
           )}
 
@@ -654,26 +642,43 @@ export function DashboardPage() {
                         onValueChange={(nextStatus) =>
                           void handleStatusChange(l, nextStatus as Listing["status"])
                         }
-                        options={[
-                          {
-                            value: "Active",
-                            label: "Active",
-                            description: "Visible to campus buyers",
-                            tone: "success",
-                          },
-                          {
-                            value: "Paused",
-                            label: "Paused",
-                            description: "Temporarily hidden",
-                            tone: "warning",
-                          },
-                          {
-                            value: l.type === "product" ? "Sold" : "Unavailable",
-                            label: l.type === "product" ? "Sold" : "Unavailable",
-                            description: "No longer accepting requests",
-                            tone: "muted",
-                          },
-                        ]}
+                        options={
+                          isSuspended
+                            ? [
+                                {
+                                  value: "Paused",
+                                  label: "Paused",
+                                  description: "Temporarily hidden",
+                                  tone: "warning",
+                                },
+                                {
+                                  value: l.type === "product" ? "Sold" : "Unavailable",
+                                  label: l.type === "product" ? "Sold" : "Unavailable",
+                                  description: "No longer accepting requests",
+                                  tone: "muted",
+                                },
+                              ]
+                            : [
+                                {
+                                  value: "Active",
+                                  label: "Active",
+                                  description: "Visible to campus buyers",
+                                  tone: "success",
+                                },
+                                {
+                                  value: "Paused",
+                                  label: "Paused",
+                                  description: "Temporarily hidden",
+                                  tone: "warning",
+                                },
+                                {
+                                  value: l.type === "product" ? "Sold" : "Unavailable",
+                                  label: l.type === "product" ? "Sold" : "Unavailable",
+                                  description: "No longer accepting requests",
+                                  tone: "muted",
+                                },
+                              ]
+                        }
                       />
                       <Button
                         variant="ghost"
@@ -704,12 +709,14 @@ export function DashboardPage() {
                 title="No listings yet"
                 text="Post a product or service to reach students on campus."
               >
-                <Button asChild>
-                  <Link to="/post">
-                    <Plus size={16} />
-                    Create listing
-                  </Link>
-                </Button>
+                {!isSuspended && (
+                  <Button asChild>
+                    <Link to="/post">
+                      <Plus size={16} />
+                      Create listing
+                    </Link>
+                  </Button>
+                )}
               </Empty>
             )}
           </section>
@@ -724,22 +731,6 @@ export function DashboardPage() {
                       {act.kind === "contact" ? <MessageCircle size={16} /> : <Eye size={16} />}
                       <span>{act.text}</span>
                       <small>{new Date(act.occurred_at).toLocaleDateString("en-GH")}</small>
-                    </div>
-                  ))
-                ) : myActivities.length > 0 ? (
-                  myActivities.slice(0, 6).map((act) => (
-                    <div className="activity-row" key={act.id}>
-                      {act.kind === "contact" ? (
-                        <MessageCircle size={16} />
-                      ) : act.kind === "save" ? (
-                        <Bookmark size={16} />
-                      ) : act.kind === "like" ? (
-                        <Heart size={16} />
-                      ) : (
-                        <Eye size={16} />
-                      )}
-                      <span>{act.text}</span>
-                      <small>{act.time}</small>
                     </div>
                   ))
                 ) : mine.length > 0 ? (
@@ -826,7 +817,6 @@ export function PostPage({
     user,
     listings,
     myListings,
-    setListings,
     refreshMyListings,
     refreshListings,
     universityNames,
@@ -925,6 +915,21 @@ export function PostPage({
 
   if (!user) return <Navigate to="/auth" replace />;
 
+  if (user.isSuspended) {
+    return (
+      <Shell>
+        <Empty
+          title="Account suspended"
+          text="Suspended accounts cannot create or edit listings. Contact CampusLoop support if you need assistance."
+        >
+          <Button asChild>
+            <Link to="/dashboard">Back to dashboard</Link>
+          </Button>
+        </Empty>
+      </Shell>
+    );
+  }
+
   if (editId && !existing) {
     return (
       <Shell>
@@ -974,7 +979,15 @@ export function PostPage({
 
   async function upload(files: FileList | null) {
     if (!files || !files.length) return;
+    if (!backendConfigured) {
+      setError("Live media storage is currently unavailable. Please try again later.");
+      return;
+    }
     const selected = Array.from(files);
+    if (draft.images.length + selected.length > 8) {
+      setError("You can attach up to 8 photos per listing.");
+      return;
+    }
     if (selected.some((f) => !f.type.startsWith("image/") || f.type === "image/svg+xml")) {
       setError("Choose JPG, PNG, or WebP image files only.");
       return;
@@ -983,29 +996,11 @@ export function PostPage({
     setUploadingImages(true);
     setError("");
     try {
-      if (backendConfigured) {
-        const uploaded = await Promise.all(
-          selected.map((file) => listingService.uploadListingImage(file)),
-        );
-        setDraft((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
-        toast.success(`${uploaded.length} photo${uploaded.length > 1 ? "s" : ""} uploaded`);
-      } else {
-        const encoded = await Promise.all(
-          selected.map(
-            (file) =>
-              new Promise<DraftImage>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () =>
-                  typeof reader.result === "string"
-                    ? resolve({ imageUrl: reader.result })
-                    : reject();
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-              }),
-          ),
-        );
-        setDraft((prev) => ({ ...prev, images: [...prev.images, ...encoded] }));
-      }
+      const uploaded = await Promise.all(
+        selected.map((file) => listingService.uploadListingImage(file)),
+      );
+      setDraft((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
+      toast.success(`${uploaded.length} photo${uploaded.length > 1 ? "s" : ""} uploaded`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "This image could not be uploaded. Try another photo.",
@@ -1044,16 +1039,7 @@ export function PostPage({
     }
 
     if (!backendConfigured) {
-      const id = existing?.id || crypto.randomUUID();
-      const listing: Listing = {
-        ...preview,
-        id,
-        postedAt: existing?.postedAt || Date.now(),
-      };
-      setListings((prev) =>
-        existing ? prev.map((l) => (l.id === id ? listing : l)) : [listing, ...prev],
-      );
-      setPublished(id);
+      setError("Live marketplace service is currently unavailable. Please try again later.");
       return;
     }
 
@@ -1215,28 +1201,6 @@ export function PostPage({
                   }}
                 />
               </label>
-
-              <div className="sample-photos">
-                <span>Or choose a sample photo:</span>
-                <div className="sample-photo-row">
-                  {sampleImages.slice(0, 4).map((s) => (
-                    <button
-                      type="button"
-                      key={s.label}
-                      className="sample-photo-btn"
-                      onClick={() => {
-                        if (!imageUrls.includes(s.src)) {
-                          update("images", [...draft.images, { imageUrl: s.src }]);
-                          setError("");
-                        }
-                      }}
-                    >
-                      <img src={s.src} alt={s.label} />
-                      <span>{s.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {draft.images.length > 0 && (
                 <div className="upload-previews">

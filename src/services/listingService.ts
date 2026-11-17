@@ -7,7 +7,7 @@ import type {
   SearchListingRow,
   UniversityRecord,
 } from "@/lib/supabase/database.types";
-import type { Listing } from "@/lib/campus/data";
+import { isSafeMediaUrl, type Listing } from "@/lib/campus/data";
 
 export interface SearchListingsParams {
   universityFilter?: string | null | undefined;
@@ -71,7 +71,8 @@ export function mapSearchRowToListing(row: SearchListingRow): Listing {
   const orderedImages = (row.images || [])
     .slice()
     .sort((a, b) => a.display_order - b.display_order)
-    .map((img) => img.image_url);
+    .map((img) => img.image_url)
+    .filter((url) => isSafeMediaUrl(url));
 
   return {
     id: row.id,
@@ -154,13 +155,17 @@ export const listingService = {
     limit = 6,
   ): Promise<Array<{ id: string; title: string; type: ListingType }>> {
     const client = getSupabaseClient();
-    if (!client || !query.trim()) return [];
+    const cleaned = query
+      .trim()
+      .replace(/[\\%_]/g, "\\$&")
+      .slice(0, 80);
+    if (!client || !cleaned) return [];
 
     const { data, error } = await client
       .from("listings")
       .select("id, title, listing_type")
       .eq("status", "Active")
-      .ilike("title", `%${query.trim()}%`)
+      .ilike("title", `%${cleaned}%`)
       .order("view_count", { ascending: false })
       .limit(limit);
 
@@ -201,6 +206,23 @@ export const listingService = {
       .eq("id", sellerId)
       .maybeSingle();
 
+    if (!sellerPublic) {
+      const { data: authData } = await client.auth.getUser();
+      const viewerId = authData.user?.id;
+      let canViewHiddenSeller = viewerId === sellerId;
+      if (!canViewHiddenSeller && viewerId) {
+        const { data: viewerProfile } = await client
+          .from("profiles")
+          .select("role")
+          .eq("id", viewerId)
+          .maybeSingle();
+        canViewHiddenSeller = viewerProfile?.["role"] === "admin";
+      }
+      if (!canViewHiddenSeller) {
+        return null;
+      }
+    }
+
     let primaryUniName = "Ghana Campus";
     if (sellerPublic?.["primary_university_id"]) {
       const { data: uniRow } = await client
@@ -219,7 +241,8 @@ export const listingService = {
     )
       .slice()
       .sort((a, b) => a.display_order - b.display_order)
-      .map((i) => i.image_url);
+      .map((i) => i.image_url)
+      .filter((url) => isSafeMediaUrl(url));
 
     const targets =
       (data["targets"] as Array<{
@@ -456,7 +479,13 @@ export const listingService = {
     if (authErr || !user) throw new Error("Sign in to upload images.");
 
     const optimized = await compressImageFile(file, 1400, 0.84);
-    const ext = optimized.name.split(".").pop()?.toLowerCase() || "jpg";
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/avif": "avif",
+    };
+    const ext = mimeToExt[optimized.type] || "jpg";
     const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
 
     const { error } = await supabase.storage.from("listing-images").upload(storagePath, optimized, {
@@ -562,7 +591,8 @@ function mapSellerRowToListing(
   )
     .slice()
     .sort((a, b) => a.display_order - b.display_order)
-    .map((i) => i.image_url);
+    .map((i) => i.image_url)
+    .filter((url) => isSafeMediaUrl(url));
   const targets =
     (row["targets"] as Array<{
       university?: { short_name?: string; university_name?: string } | null;

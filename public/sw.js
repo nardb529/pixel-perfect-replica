@@ -1,10 +1,19 @@
-const CACHE_NAME = "campusloop-v3";
+const CACHE_NAME = "campusloop-v4";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.svg",
   "/pwa-192x192.png",
   "/pwa-512x512.png",
   "/apple-touch-icon.png",
+];
+const PRIVATE_ROUTE_PREFIXES = [
+  "/admin",
+  "/dashboard",
+  "/post",
+  "/profile",
+  "/auth",
+  "/reset-password",
+  "/api/",
 ];
 
 self.addEventListener("install", (event) => {
@@ -68,11 +77,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigations & dynamic responses: network-first so updates appear immediately
+  // Private or authenticated routes: network-only, never store HTML in cache
+  const isPrivateRoute = PRIVATE_ROUTE_PREFIXES.some(
+    (prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`),
+  );
+  if (isPrivateRoute) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Public navigations & dynamic responses: network-first so updates appear immediately
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok) {
+        if (response.ok && request.headers.get("accept")?.includes("text/html")) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }

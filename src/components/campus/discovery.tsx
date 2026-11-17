@@ -46,6 +46,9 @@ const shortcuts = [
 export function DiscoverPage() {
   const {
     listings,
+    listingsLoading,
+    listingsError,
+    refreshListings,
     university,
     setUniversity,
     universityNames,
@@ -195,23 +198,48 @@ export function DiscoverPage() {
           )}
         </SectionTitle>
 
-        {results.length ? (
+        {listingsLoading && results.length === 0 ? (
+          <div className="listing-grid">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="route-skeleton-card" />
+            ))}
+          </div>
+        ) : listingsError && results.length === 0 ? (
+          <Empty title="Could not load listings" text={listingsError}>
+            <Button variant="outline" onClick={() => void refreshListings()}>
+              Retry
+            </Button>
+          </Empty>
+        ) : results.length ? (
           <div className={searching ? "listing-grid" : "listing-carousel"}>
             {(searching ? results : results.slice(0, 4)).map((l) => (
               <ListingCard key={l.id} listing={l} />
             ))}
           </div>
         ) : (
-          <Empty>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setQuery("");
-                setCategory("All");
-              }}
-            >
-              Show all in {university}
-            </Button>
+          <Empty
+            title={searching ? "No matching listings" : `No listings in ${university} yet`}
+            text={
+              searching
+                ? "Try clearing your search or switching to All Universities."
+                : "Be the first student or seller to post in this campus community."
+            }
+          >
+            {searching ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQuery("");
+                  setCategory("All");
+                }}
+              >
+                Show all in {university}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setUniversity("All Universities")}>
+                Browse All Universities
+              </Button>
+            )}
           </Empty>
         )}
       </section>
@@ -222,7 +250,13 @@ export function DiscoverPage() {
             <SectionTitle title="Services on campus">
               <BrowseLink service />
             </SectionTitle>
-            {services.length ? (
+            {listingsLoading && services.length === 0 ? (
+              <div className="listing-grid">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="route-skeleton-card" />
+                ))}
+              </div>
+            ) : services.length ? (
               <div className="listing-carousel">
                 {services.map((l) => (
                   <ListingCard key={l.id} listing={l} />
@@ -239,7 +273,13 @@ export function DiscoverPage() {
                 See all <ArrowRight size={14} />
               </Link>
             </SectionTitle>
-            {affordable.length ? (
+            {listingsLoading && affordable.length === 0 ? (
+              <div className="listing-grid">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="route-skeleton-card" />
+                ))}
+              </div>
+            ) : affordable.length ? (
               <div className="listing-carousel">
                 {affordable.map((l) => (
                   <ListingCard key={l.id} listing={l} />
@@ -303,7 +343,6 @@ export function BrowsePage({
     serviceCategoryNames,
     backendConfigured,
     schemaReady,
-    hasLiveListings,
   } = useCampus();
   const navigate = useNavigate();
   const [query, setQuery] = useState(initialQuery || "");
@@ -406,8 +445,7 @@ export function BrowsePage({
     [listings, university, query, type, category, maxPrice, sort],
   );
 
-  const usingRemote =
-    backendConfigured && schemaReady && !dbSearchFailed && (hasLiveListings || dbTotal > 0);
+  const usingRemote = backendConfigured && schemaReady && !dbSearchFailed;
   const visibleResults = usingRemote ? dbResults : localResults.slice(0, localVisibleCount);
   const totalCount = usingRemote ? dbTotal : localResults.length;
   const hasMore = usingRemote

@@ -47,13 +47,16 @@ async function writeAuditLog(action: string, targetType: string, targetId: strin
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from("moderation_logs").insert({
+  const { error } = await supabase.from("moderation_logs").insert({
     admin_id: user.id,
     action,
     target_type: targetType,
     target_id: targetId,
     notes: notes ?? null,
   });
+  if (error) {
+    console.warn("Audit log write failed:", error.message);
+  }
 }
 
 export const adminService = {
@@ -169,7 +172,7 @@ export const adminService = {
     if (error) throw error;
 
     await writeAuditLog(`user_verification_${status}`, "profile", userId, note);
-    await supabase.from("notifications").insert({
+    const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
       title:
         status === "verified"
@@ -183,6 +186,7 @@ export const adminService = {
           : note || `Your seller verification status was updated to ${status}.`,
       notification_type: "account_update" as NotificationType,
     });
+    if (notifErr) throw notifErr;
   },
 
   async updateUserRole(userId: string, role: UserRole): Promise<void> {
@@ -197,7 +201,7 @@ export const adminService = {
     if (error) throw error;
 
     await writeAuditLog(`user_role_${role}`, "profile", userId);
-    await supabase.from("notifications").insert({
+    const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
       title: role === "admin" ? "Administrator access granted" : "Administrator access updated",
       message:
@@ -206,6 +210,7 @@ export const adminService = {
           : "Your account role was changed to standard member.",
       notification_type: "account_update" as NotificationType,
     });
+    if (notifErr) throw notifErr;
   },
 
   async sendBroadcastNotification(input: {
@@ -314,15 +319,27 @@ export const adminService = {
 
   async uploadUniversityLogo(file: File, slug: string): Promise<string> {
     const supabase = requireSupabase();
-    if (!file.type.startsWith("image/")) {
-      throw new Error("Choose an image or SVG logo.");
+    const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/svg+xml"]);
+    if (!allowedMimeTypes.has(file.type)) {
+      throw new Error("Choose a JPG, PNG, WebP, or SVG logo.");
     }
     if (file.size > 2 * 1024 * 1024) {
       throw new Error("University logos must be 2 MB or smaller.");
     }
     const optimized = await compressImageFile(file, 512, 0.9);
-    const ext = optimized.name.split(".").pop()?.toLowerCase() || "png";
-    const path = `${slug}-${Date.now()}.${ext}`;
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/svg+xml": "svg",
+    };
+    const ext = mimeToExt[optimized.type] || "png";
+    const safeSlug =
+      slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "") || "campus";
+    const path = `${safeSlug}-${Date.now()}.${ext}`;
     const { error } = await supabase.storage
       .from("university-logos")
       .upload(path, optimized, { upsert: true, contentType: optimized.type });

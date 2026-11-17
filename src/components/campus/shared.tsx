@@ -1,4 +1,11 @@
-import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowUpRight,
@@ -37,6 +44,7 @@ import {
   buildPhoneHref,
   buildWhatsAppUrl,
   formatListingPrice,
+  isSafeMediaUrl,
   type Listing,
 } from "@/lib/campus/data";
 
@@ -587,6 +595,8 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
   const whatsappUrl = buildWhatsAppUrl(listing.contact, enquiryText);
   const phoneHref = buildPhoneHref(listing.contact);
 
+  const safeImage = isSafeMediaUrl(listing.image) ? listing.image : "";
+
   function handleQuickAction() {
     recordContact(listing.id, listing.contactMethod || "WhatsApp");
     setQuickOpen(true);
@@ -597,9 +607,9 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
       <article className={`listing-card ${compact ? "compact" : ""}`}>
         <div className="listing-image">
           <Link to="/listing/$id" params={{ id: listing.id }} aria-label={`View ${listing.title}`}>
-            {!imgFailed && listing.image ? (
+            {!imgFailed && safeImage ? (
               <img
-                src={listing.image}
+                src={safeImage}
                 alt={listing.title}
                 loading="lazy"
                 decoding="async"
@@ -691,8 +701,8 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
             </DialogDescription>
             <div className="modal-body">
               <div className="quick-listing-preview">
-                {!imgFailed && listing.image ? (
-                  <img src={listing.image} alt={listing.title} />
+                {!imgFailed && safeImage ? (
+                  <img src={safeImage} alt={listing.title} />
                 ) : (
                   <span className="quick-listing-thumb-fallback">
                     {isService ? <Briefcase size={18} /> : <ShoppingBag size={18} />}
@@ -717,11 +727,7 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
               </div>
 
               {phoneHref && (
-                <a
-                  href={phoneHref}
-                  onClick={() => recordContact(listing.id, "Phone call")}
-                  className="contact-method"
-                >
+                <a href={phoneHref} className="contact-method">
                   <Phone size={20} />
                   <div>
                     <strong>Call directly</strong>
@@ -739,7 +745,6 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => {
-                        recordContact(listing.id, "WhatsApp");
                         toast.success(`Opening WhatsApp chat with ${listing.seller}`);
                         setQuickOpen(false);
                       }}
@@ -752,8 +757,12 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                   <Button
                     className="onboarding-cta"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(enquiryText);
-                      toast.success("Enquiry copied — reach out via seller contact");
+                      try {
+                        await navigator.clipboard.writeText(enquiryText);
+                        toast.success("Enquiry copied — reach out via seller contact");
+                      } catch {
+                        toast.error("Copy failed — reach out using the contact details above");
+                      }
                       setQuickOpen(false);
                     }}
                   >
@@ -765,8 +774,12 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                   variant="outline"
                   className="rounded-full"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(enquiryText);
-                    toast.success("Enquiry message copied");
+                    try {
+                      await navigator.clipboard.writeText(enquiryText);
+                      toast.success("Enquiry message copied");
+                    } catch {
+                      toast.error("Could not copy message automatically");
+                    }
                   }}
                 >
                   <Copy size={16} />
@@ -806,6 +819,15 @@ export function SearchBar({
   onSelectSuggestion?: ((item: { id: string; title: string }) => void) | undefined;
 }) {
   const [focused, setFocused] = useState(false);
+  const blurTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current !== undefined) {
+        window.clearTimeout(blurTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="relative z-10">
@@ -815,8 +837,15 @@ export function SearchBar({
           aria-label="Search marketplace"
           placeholder={placeholder}
           value={value}
-          onFocus={() => setFocused(true)}
-          onBlur={() => window.setTimeout(() => setFocused(false), 140)}
+          onFocus={() => {
+            if (blurTimerRef.current !== undefined) {
+              window.clearTimeout(blurTimerRef.current);
+            }
+            setFocused(true);
+          }}
+          onBlur={() => {
+            blurTimerRef.current = window.setTimeout(() => setFocused(false), 140);
+          }}
           onChange={(e) => onChange(e.target.value)}
         />
         {value && (

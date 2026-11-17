@@ -14,6 +14,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ALLOWED_CONTACT_METHODS = new Set(["WhatsApp", "Phone call", "Email"]);
+
 function sanitizeWhatsAppDigits(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
@@ -53,13 +56,15 @@ Deno.serve(async (req: Request) => {
       visitorSessionId?: string;
     };
 
-    const listingId = body.listingId?.trim();
-    const contactMethod = body.contactMethod?.trim() || "WhatsApp";
-    const universityId = body.universityId || null;
-    const visitorSessionId = body.visitorSessionId?.trim() || "anon-session";
+    const listingId = body.listingId?.trim() || "";
+    const rawMethod = body.contactMethod?.trim() || "WhatsApp";
+    const contactMethod = ALLOWED_CONTACT_METHODS.has(rawMethod) ? rawMethod : "WhatsApp";
+    const rawUni = body.universityId?.trim() || null;
+    const universityId = rawUni && UUID_REGEX.test(rawUni) ? rawUni : null;
+    const visitorSessionId = (body.visitorSessionId?.trim() || "anon-session").slice(0, 120);
 
-    if (!listingId) {
-      return new Response(JSON.stringify({ error: "listingId is required" }), {
+    if (!UUID_REGEX.test(listingId)) {
+      return new Response(JSON.stringify({ error: "Valid listingId UUID is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -83,6 +88,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const { data: sellerProfile } = await adminClient
+      .from("profiles")
+      .select("is_suspended")
+      .eq("id", listing.seller_id)
+      .maybeSingle();
+
+    if (sellerProfile?.is_suspended) {
+      return new Response(JSON.stringify({ error: "Listing is currently unavailable" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: recentClicks } = await adminClient
       .from("contact_clicks")
       .select("id")
@@ -94,23 +112,13 @@ Deno.serve(async (req: Request) => {
 
     let recorded = false;
     if (!recentClicks || recentClicks.length === 0) {
-      const { error: insertErr } = await adminClient.from("contact_clicks").insert({
-        listing_id: listing.id,
-        seller_id: listing.seller_id,
-        contact_method: contactMethod,
-        university_id: universityId,
-        visitor_session_id: visitorSessionId,
+      const { error: rpcErr } = await adminClient.rpc("record_contact_click", {
+        p_listing_id: listing.id,
+        p_contact_method: contactMethod,
+        p_university_id: universityId,
+        p_visitor_session_id: visitorSessionId,
       });
-
-      if (!insertErr) {
-        recorded = true;
-        await adminClient.rpc("record_contact_click", {
-          p_listing_id: listing.id,
-          p_contact_method: contactMethod,
-          p_university_id: universityId,
-          p_visitor_session_id: `${visitorSessionId}:edge`,
-        });
-      }
+      recorded = !rpcErr;
     }
 
     const contactValue = String(listing.contact_value || "").trim();

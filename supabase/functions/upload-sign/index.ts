@@ -23,6 +23,14 @@ const IMAGE_MIME_TYPES = new Set([
   "image/svg+xml",
 ]);
 
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/svg+xml": "svg",
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -81,7 +89,6 @@ Deno.serve(async (req: Request) => {
     const bucket = body.bucket || "listing-images";
     const mimeType = body.mimeType || "";
     const fileSize = Number(body.fileSize || 0);
-    const ext = (body.extension || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
 
     if (!ALLOWED_BUCKETS.has(bucket)) {
       return new Response(JSON.stringify({ error: "Invalid bucket" }), {
@@ -100,6 +107,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const ext = MIME_TO_EXT[mimeType] || "jpg";
+
     const maxBytes = bucket === "university-logos" ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
     if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > maxBytes) {
       return new Response(JSON.stringify({ error: "Image exceeds file size limit" }), {
@@ -112,18 +121,24 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false },
     });
 
-    if (bucket === "university-logos") {
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profile?.role !== "admin") {
-        return new Response(JSON.stringify({ error: "Admin role required for university logos" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("role, is_suspended")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.is_suspended) {
+      return new Response(JSON.stringify({ error: "Suspended accounts cannot upload media" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (bucket === "university-logos" && profile?.role !== "admin") {
+      return new Response(JSON.stringify({ error: "Admin role required for university logos" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const objectPath = `${user.id}/${crypto.randomUUID()}.${ext}`;

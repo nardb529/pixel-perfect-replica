@@ -86,9 +86,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const VALID_LISTING_STATUSES = new Set(["Active", "Paused", "Sold", "Pending", "Rejected"]);
+    const VALID_REPORT_STATUSES = new Set(["open", "reviewing", "resolved", "dismissed"]);
+
     const payload = (await req.json()) as AdminAction;
 
     if (payload.action === "moderate_listing") {
+      if (!UUID_REGEX.test(payload.listingId) || !VALID_LISTING_STATUSES.has(payload.status)) {
+        return new Response(JSON.stringify({ error: "Invalid listingId or moderation status" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: listing } = await adminClient
         .from("listings")
         .select("id, seller_id, title")
@@ -101,81 +112,117 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await adminClient
+      const { error: updateErr } = await adminClient
         .from("listings")
         .update({ status: payload.status })
         .eq("id", payload.listingId);
+      if (updateErr) throw new Error(updateErr.message);
 
-      await adminClient.from("moderation_logs").insert({
+      const { error: logErr } = await adminClient.from("moderation_logs").insert({
         admin_id: user.id,
         action: `listing_status_${payload.status.toLowerCase()}`,
         target_type: "listing",
         target_id: payload.listingId,
-        notes: payload.note ?? null,
+        notes: payload.note?.slice(0, 500) ?? null,
       });
+      if (logErr) throw new Error(logErr.message);
 
-      await adminClient.from("notifications").insert({
+      const { error: notifErr } = await adminClient.from("notifications").insert({
         user_id: listing.seller_id,
         title: payload.status === "Active" ? "Listing approved" : "Listing status updated",
         message: `"${listing.title}" is now ${payload.status}.${payload.note ? ` Note: ${payload.note}` : ""}`,
         notification_type: payload.status === "Rejected" ? "listing_rejected" : "listing_approved",
       });
+      if (notifErr) throw new Error(notifErr.message);
     } else if (payload.action === "toggle_featured") {
-      await adminClient
-        .from("listings")
-        .update({ is_featured: payload.featured })
-        .eq("id", payload.listingId);
+      if (!UUID_REGEX.test(payload.listingId)) {
+        return new Response(JSON.stringify({ error: "Invalid listingId" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      await adminClient.from("moderation_logs").insert({
+      const { error: featErr } = await adminClient
+        .from("listings")
+        .update({ is_featured: Boolean(payload.featured) })
+        .eq("id", payload.listingId);
+      if (featErr) throw new Error(featErr.message);
+
+      const { error: logErr } = await adminClient.from("moderation_logs").insert({
         admin_id: user.id,
         action: payload.featured ? "feature_listing" : "unfeature_listing",
         target_type: "listing",
         target_id: payload.listingId,
       });
+      if (logErr) throw new Error(logErr.message);
     } else if (payload.action === "suspend_user") {
+      if (!UUID_REGEX.test(payload.userId)) {
+        return new Response(JSON.stringify({ error: "Invalid userId" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       if (payload.userId === user.id) {
         return new Response(JSON.stringify({ error: "Cannot suspend your own admin account" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      await adminClient
+
+      const { error: suspErr } = await adminClient
         .from("profiles")
-        .update({ is_suspended: payload.suspended })
+        .update({ is_suspended: Boolean(payload.suspended) })
         .eq("id", payload.userId);
+      if (suspErr) throw new Error(suspErr.message);
 
       if (payload.suspended) {
-        await adminClient
+        const { error: pauseErr } = await adminClient
           .from("listings")
           .update({ status: "Paused" })
           .eq("seller_id", payload.userId)
           .eq("status", "Active");
+        if (pauseErr) throw new Error(pauseErr.message);
       }
 
-      await adminClient.from("moderation_logs").insert({
+      const { error: logErr } = await adminClient.from("moderation_logs").insert({
         admin_id: user.id,
         action: payload.suspended ? "suspend_user" : "restore_user",
         target_type: "profile",
         target_id: payload.userId,
-        notes: payload.note ?? null,
+        notes: payload.note?.slice(0, 500) ?? null,
       });
+      if (logErr) throw new Error(logErr.message);
     } else if (payload.action === "resolve_report") {
-      await adminClient
+      if (!UUID_REGEX.test(payload.reportId) || !VALID_REPORT_STATUSES.has(payload.status)) {
+        return new Response(JSON.stringify({ error: "Invalid reportId or status" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: repErr } = await adminClient
         .from("reports")
         .update({
           status: payload.status,
           reviewed_by: user.id,
           reviewed_at: new Date().toISOString(),
-          moderation_note: payload.note ?? null,
+          moderation_note: payload.note?.slice(0, 500) ?? null,
         })
         .eq("id", payload.reportId);
+      if (repErr) throw new Error(repErr.message);
 
-      await adminClient.from("moderation_logs").insert({
+      const { error: logErr } = await adminClient.from("moderation_logs").insert({
         admin_id: user.id,
         action: `report_${payload.status}`,
         target_type: "report",
         target_id: payload.reportId,
-        notes: payload.note ?? null,
+        notes: payload.note?.slice(0, 500) ?? null,
+      });
+      if (logErr) throw new Error(logErr.message);
+    } else {
+      return new Response(JSON.stringify({ error: "Unsupported moderation action" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

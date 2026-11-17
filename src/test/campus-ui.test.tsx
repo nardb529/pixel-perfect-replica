@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AnimatedSelect } from "@/components/campus/shared";
+import { AnimatedSelect, ListingCard } from "@/components/campus/shared";
 import { CampusProvider } from "@/components/campus/store";
-import { initialListings } from "@/lib/campus/data";
+import type { Listing } from "@/lib/campus/data";
 
 vi.mock("@tanstack/react-router", async () => {
   const actual =
@@ -28,8 +28,48 @@ vi.mock("@tanstack/react-router", async () => {
   };
 });
 
-import { ListingCard } from "@/components/campus/shared";
 import { AdminPage } from "@/components/campus/admin";
+import { AuthPage } from "@/components/campus/auth";
+import { DiscoverPage } from "@/components/campus/discovery";
+
+const productFixture: Listing = {
+  id: "prod-1",
+  title: "HP EliteBook 840 G6",
+  type: "product",
+  category: "Electronics",
+  price: 3400,
+  image: "https://cdn.example.com/laptop.jpg",
+  seller: "Ama Boateng",
+  university: "KNUST",
+  audience: ["KNUST"],
+  description: "Clean Core i5 laptop with original charger.",
+  time: "2h ago",
+  status: "Active",
+  views: 12,
+  likes: 2,
+  contact: "0241112233",
+  contactMethod: "WhatsApp",
+};
+
+const serviceFixture: Listing = {
+  id: "serv-1",
+  title: "Campus Flyer & Brand Design",
+  type: "service",
+  category: "Graphic Design",
+  price: 120,
+  priceType: "Starting from",
+  image: "https://cdn.example.com/design.jpg",
+  seller: "Kofi Mensah",
+  university: "University of Ghana",
+  audience: ["All Universities"],
+  description: "Fast turnaround event posters and club branding.",
+  time: "1h ago",
+  status: "Active",
+  views: 8,
+  likes: 1,
+  contact: "0552223344",
+  contactMethod: "WhatsApp",
+};
 
 describe("AnimatedSelect dropdown", () => {
   it("opens options, updates value, and syncs hidden form input", () => {
@@ -65,13 +105,9 @@ describe("AnimatedSelect dropdown", () => {
 
 describe("ListingCard actions", () => {
   it("renders 'Get now' on product listings and opens quick connect dialog", () => {
-    const product = initialListings.find((l) => l.type === "product");
-    expect(product).toBeDefined();
-    if (!product) return;
-
     render(
       <CampusProvider>
-        <ListingCard listing={product} />
+        <ListingCard listing={productFixture} />
       </CampusProvider>,
     );
 
@@ -79,17 +115,13 @@ describe("ListingCard actions", () => {
     expect(getNowBtn).toBeInTheDocument();
 
     fireEvent.click(getNowBtn);
-    expect(screen.getByText(`Get ${product.title}`)).toBeInTheDocument();
+    expect(screen.getByText(`Get ${productFixture.title}`)).toBeInTheDocument();
   });
 
   it("renders 'Contact' on service listings and opens quick connect dialog", () => {
-    const service = initialListings.find((l) => l.type === "service");
-    expect(service).toBeDefined();
-    if (!service) return;
-
     render(
       <CampusProvider>
-        <ListingCard listing={service} />
+        <ListingCard listing={serviceFixture} />
       </CampusProvider>,
     );
 
@@ -97,31 +129,46 @@ describe("ListingCard actions", () => {
     expect(contactBtn).toBeInTheDocument();
 
     fireEvent.click(contactBtn);
-    expect(screen.getByText(`Contact ${service.seller}`)).toBeInTheDocument();
+    expect(screen.getByText(`Contact ${serviceFixture.seller}`)).toBeInTheDocument();
   });
 });
 
-describe("AdminPage Command Center", () => {
-  it("renders command overview KPIs and switches across management sections", () => {
+describe("Commercial marketplace & fail-closed security gates", () => {
+  it("renders empty marketplace state with zero demo listings when no backend items exist", () => {
+    render(
+      <CampusProvider>
+        <DiscoverPage />
+      </CampusProvider>,
+    );
+
+    expect(screen.getByText(/No listings in .* yet/i)).toBeInTheDocument();
+  });
+
+  it("disables authentication submission when backend credentials are unavailable", () => {
+    render(
+      <CampusProvider>
+        <AuthPage />
+      </CampusProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: /Create account/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Log In/i }));
+    expect(screen.getByRole("button", { name: /Sign in/i })).toBeDisabled();
+  });
+
+  it("denies access to AdminPage when unauthenticated or non-admin", () => {
     render(
       <CampusProvider>
         <AdminPage />
       </CampusProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "Platform Administration" })).toBeInTheDocument();
-    expect(screen.getByText("Campus Distribution & Action Queue")).toBeInTheDocument();
-
-    const listingsTab = screen.getByRole("tab", { name: /Listings/i });
-    fireEvent.click(listingsTab);
-    expect(screen.getByText("All Marketplace Listings")).toBeInTheDocument();
-
-    const announcementsTab = screen.getByRole("tab", { name: /Announcements/i });
-    fireEvent.click(announcementsTab);
-    expect(screen.getByText("Announcements & User Notifications")).toBeInTheDocument();
-
-    const auditTab = screen.getByRole("tab", { name: /Audit Log/i });
-    fireEvent.click(auditTab);
-    expect(screen.getByText("Moderation & Admin Audit Log")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Admin authorization required" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Access restricted")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Platform Administration" }),
+    ).not.toBeInTheDocument();
   });
 });

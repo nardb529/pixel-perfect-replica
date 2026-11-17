@@ -9,10 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import {
-  initialListings,
-  productCategories as fallbackProductCategories,
-  serviceCategories as fallbackServiceCategories,
-  universities as fallbackUniversities,
+  productCategories as defaultProductCategories,
+  serviceCategories as defaultServiceCategories,
+  universities as defaultUniversities,
   type Listing,
 } from "@/lib/campus/data";
 import { isSchemaMissingError, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -38,7 +37,7 @@ import {
   universityService,
 } from "@/services";
 
-export type DemoUser = {
+export type CampusUser = {
   id?: string | undefined;
   name: string;
   username?: string | undefined;
@@ -58,21 +57,6 @@ export type DemoUser = {
   notificationPreferences?: NotificationPreferences | undefined;
 };
 
-export type DemoReport = {
-  id: string;
-  listingId: string;
-  reason: string;
-  resolved?: boolean | undefined;
-};
-
-export type DemoActivity = {
-  id: string;
-  listingId: string;
-  kind: "view" | "save" | "contact" | "like";
-  text: string;
-  time: string;
-};
-
 export type ThemeMode = "light" | "dark";
 export type SellerPostAuthStage = "none" | "notifications" | "install";
 
@@ -84,9 +68,9 @@ interface BeforeInstallPromptEvent extends Event {
 const NOTIF_PROMPTED_KEY = "cl_notif_prompted_v1";
 const THEME_STORAGE_KEY = "cl_theme_v1";
 
-function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): DemoUser {
+function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): CampusUser {
   const matchedUni = uniList.find((u) => u.id === profile.primary_university_id);
-  const universityName = matchedUni?.short_name || matchedUni?.university_name || "KNUST";
+  const universityName = matchedUni?.short_name || matchedUni?.university_name || "Ghana Campus";
   return {
     id: profile.id,
     name: profile.full_name,
@@ -111,7 +95,8 @@ function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): 
 type Store = {
   backendConfigured: boolean;
   schemaReady: boolean;
-  hasLiveListings: boolean;
+  listingsLoading: boolean;
+  listingsError: string | null;
   authLoading: boolean;
   university: string;
   setUniversity: (v: string) => void;
@@ -124,12 +109,10 @@ type Store = {
   serviceCategoryNames: string[];
   refreshMetadata: () => Promise<void>;
   refreshListings: () => Promise<void>;
-  user: DemoUser | null;
-  setUser: (v: DemoUser | null) => void;
+  user: CampusUser | null;
+  setUser: (v: CampusUser | null) => void;
   signOutUser: () => Promise<void>;
-  refreshProfile: () => Promise<DemoUser | null>;
-  rememberedAccounts: Record<string, DemoUser>;
-  registerAccount: (account: DemoUser) => void;
+  refreshProfile: () => Promise<CampusUser | null>;
   listings: Listing[];
   setListings: React.Dispatch<React.SetStateAction<Listing[]>>;
   myListings: Listing[];
@@ -141,10 +124,7 @@ type Store = {
   contacts: string[];
   recordContact: (id: string, method?: string) => void;
   recordView: (id: string, source?: string) => void;
-  activities: DemoActivity[];
-  reports: DemoReport[];
-  reportListing: (id: string, reason: string, description?: string) => void;
-  resolveReport: (id: string) => void;
+  reportListing: (id: string, reason: string, description?: string) => Promise<boolean>;
   notifications: NotificationRecord[];
   unreadNotificationCount: number;
   refreshNotifications: () => Promise<void>;
@@ -184,23 +164,21 @@ function detectStandalone() {
 export function CampusProvider({ children }: { children: ReactNode }) {
   const [backendConfigured] = useState<boolean>(isSupabaseConfigured);
   const [schemaReady, setSchemaReady] = useState<boolean>(isSupabaseConfigured);
-  const [hasLiveListings, setHasLiveListings] = useState<boolean>(false);
+  const [listingsLoading, setListingsLoading] = useState<boolean>(isSupabaseConfigured);
+  const [listingsError, setListingsError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(isSupabaseConfigured);
   const [myUniversity, setMyUniversity] = useState("KNUST");
   const [university, setUniversity] = useState("KNUST");
   const [dbUniversities, setDbUniversities] = useState<UniversityRecord[]>([]);
   const [dbCategories, setDbCategories] = useState<CategoryRecord[]>([]);
-  const [user, setUserState] = useState<DemoUser | null>(null);
-  const [rememberedAccounts, setRememberedAccounts] = useState<Record<string, DemoUser>>({});
-  const [listings, setListings] = useState<Listing[]>(initialListings);
+  const [user, setUserState] = useState<CampusUser | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [saved, setSaved] = useState<string[]>(() =>
     typeof window !== "undefined" ? favoriteService.getAnonymousFavorites() : [],
   );
   const [liked, setLiked] = useState<string[]>([]);
   const [contacts, setContacts] = useState<string[]>([]);
-  const [reports, setReports] = useState<DemoReport[]>([]);
-  const [activities, setActivities] = useState<DemoActivity[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
 
   const [theme, setTheme] = useState<ThemeMode>("light");
@@ -220,18 +198,18 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     () =>
       dbUniversities.length > 0
         ? dbUniversities.filter((u) => u.is_active).map((u) => u.short_name || u.university_name)
-        : fallbackUniversities,
+        : defaultUniversities,
     [dbUniversities],
   );
 
   const productCategoryNames = useMemo(() => {
     const active = dbCategories.filter((c) => c.is_active && c.category_type === "product");
-    return active.length > 0 ? active.map((c) => c.name) : fallbackProductCategories;
+    return active.length > 0 ? active.map((c) => c.name) : defaultProductCategories;
   }, [dbCategories]);
 
   const serviceCategoryNames = useMemo(() => {
     const active = dbCategories.filter((c) => c.is_active && c.category_type === "service");
-    return active.length > 0 ? active.map((c) => c.name) : fallbackServiceCategories;
+    return active.length > 0 ? active.map((c) => c.name) : defaultServiceCategories;
   }, [dbCategories]);
 
   const refreshMetadata = useCallback(async () => {
@@ -252,7 +230,13 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshListings = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      setListingsLoading(false);
+      setListings([]);
+      return;
+    }
+    setListingsLoading(true);
+    setListingsError(null);
     try {
       const { items } = await listingService.searchListings({
         universityFilter: university === "All Universities" ? null : university,
@@ -260,14 +244,16 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         offset: 0,
       });
       setSchemaReady(true);
-      setHasLiveListings(items.length > 0);
-      setListings(items.length > 0 ? items : initialListings);
+      setListings(items);
     } catch (err) {
       if (isSchemaMissingError(err)) {
         setSchemaReady(false);
-        setHasLiveListings(false);
-        setListings(initialListings);
+      } else {
+        setListingsError(err instanceof Error ? err.message : "Could not load campus listings.");
       }
+      setListings([]);
+    } finally {
+      setListingsLoading(false);
     }
   }, [university]);
 
@@ -291,7 +277,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshProfile = useCallback(async (): Promise<DemoUser | null> => {
+  const refreshProfile = useCallback(async (): Promise<CampusUser | null> => {
     if (!isSupabaseConfigured) {
       setAuthLoading(false);
       return null;
@@ -324,7 +310,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         setDbUniversities(unis);
       }
 
-      let resolvedUser: DemoUser;
+      let resolvedUser: CampusUser;
       if (profile) {
         resolvedUser = mapProfileToUser(profile, unis);
         setUserState(resolvedUser);
@@ -334,7 +320,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
           id: session.user.id,
           name: String(session.user.user_metadata?.["full_name"] || "Campus Seller"),
           email: session.user.email || "",
-          university: String(session.user.user_metadata?.["university_name"] || "KNUST"),
+          university: String(session.user.user_metadata?.["university_name"] || "Ghana Campus"),
           capability: String(session.user.user_metadata?.["account_type"] || "Both"),
           bio: "",
           contact: "WhatsApp",
@@ -418,7 +404,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    void refreshMetadata().then(() => refreshProfile());
+    void Promise.all([refreshMetadata(), refreshProfile()]);
     const sub = authenticationService.onAuthStateChange((_event, _session) => {
       void refreshProfile();
     });
@@ -523,11 +509,10 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   const listingsRef = useRef(listings);
   listingsRef.current = listings;
 
-  const setUser = useCallback((next: DemoUser | null) => {
+  const setUser = useCallback((next: CampusUser | null) => {
     setUserState(next);
     if (next) {
       setMyUniversity(next.university);
-      setRememberedAccounts((prev) => ({ ...prev, [next.email]: next }));
     }
   }, []);
 
@@ -541,34 +526,6 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     setSaved(favoriteService.getAnonymousFavorites());
   }, []);
 
-  const registerAccount = useCallback(
-    (account: DemoUser) => {
-      setRememberedAccounts((prev) => ({ ...prev, [account.email]: account }));
-      setUser(account);
-    },
-    [setUser],
-  );
-
-  const pushActivity = useCallback(
-    (listingId: string, kind: DemoActivity["kind"], verb: string) => {
-      const target = listingsRef.current.find((l) => l.id === listingId);
-      if (!target) return;
-      setActivities((prev) =>
-        [
-          {
-            id: crypto.randomUUID(),
-            listingId,
-            kind,
-            text: `${verb} “${target.title}”`,
-            time: "Just now",
-          },
-          ...prev,
-        ].slice(0, 20),
-      );
-    },
-    [],
-  );
-
   const selectedUniversityId = useMemo(
     () =>
       dbUniversities.find((u) => u.short_name === university || u.university_name === university)
@@ -578,54 +535,39 @@ export function CampusProvider({ children }: { children: ReactNode }) {
 
   const recordView = useCallback(
     (id: string, source = "marketplace") => {
-      if (isSupabaseConfigured) {
-        void analyticsService.recordView(id, selectedUniversityId, source).then((recorded) => {
-          if (recorded) {
-            setListings((prev) =>
-              prev.map((l) => (l.id === id ? { ...l, views: l.views + 1 } : l)),
-            );
-          }
-        });
-        return;
-      }
-      setListings((prev) => prev.map((l) => (l.id === id ? { ...l, views: l.views + 1 } : l)));
-      pushActivity(id, "view", "Someone viewed");
+      if (!isSupabaseConfigured) return;
+      void analyticsService.recordView(id, selectedUniversityId, source).then((recorded) => {
+        if (recorded) {
+          setListings((prev) => prev.map((l) => (l.id === id ? { ...l, views: l.views + 1 } : l)));
+        }
+      });
     },
-    [pushActivity, selectedUniversityId],
+    [selectedUniversityId],
   );
 
   const recordContact = useCallback(
     (id: string, method = "WhatsApp") => {
-      setContacts((prev) => [...prev, id]);
-      if (isSupabaseConfigured) {
-        void analyticsService.recordContactClick(id, method, selectedUniversityId);
-        return;
-      }
-      pushActivity(id, "contact", "Someone clicked Contact on");
+      setContacts((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      if (!isSupabaseConfigured) return;
+      void analyticsService.recordContactClick(id, method, selectedUniversityId);
     },
-    [pushActivity, selectedUniversityId],
+    [selectedUniversityId],
   );
 
-  const reportListing = useCallback((listingId: string, reason: string, description = "") => {
-    if (isSupabaseConfigured) {
+  const reportListing = useCallback(
+    async (listingId: string, reason: string, description = ""): Promise<boolean> => {
+      if (!isSupabaseConfigured) return false;
       const target = listingsRef.current.find((l) => l.id === listingId);
-      void reportService.submitReport({
+      await reportService.submitReport({
         listingId,
         reportedUserId: target?.sellerId ?? null,
         reason: reason as ReportReason,
         description,
       });
-      return;
-    }
-    setReports((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), listingId, reason, resolved: false },
-    ]);
-  }, []);
-
-  const resolveReport = useCallback((id: string) => {
-    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, resolved: !r.resolved } : r)));
-  }, []);
+      return true;
+    },
+    [],
+  );
 
   const toggleSave = useCallback(
     (id: string) => {
@@ -639,34 +581,26 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         } else {
           favoriteService.setAnonymousFavorites(next);
         }
-        if (!exists && !isSupabaseConfigured) {
-          pushActivity(id, "save", "A student saved");
-        }
         return next;
       });
     },
-    [pushActivity, user?.id],
+    [user?.id],
   );
 
-  const toggleLike = useCallback(
-    (id: string) => {
-      setLiked((prev) => {
-        const exists = prev.includes(id);
-        setListings((list) =>
-          list.map((l) =>
-            l.id === id ? { ...l, likes: Math.max(0, l.likes + (exists ? -1 : 1)) } : l,
-          ),
-        );
-        if (isSupabaseConfigured) {
-          void analyticsService.toggleLike(id).catch(() => undefined);
-        } else if (!exists) {
-          pushActivity(id, "like", "Someone liked");
-        }
-        return exists ? prev.filter((v) => v !== id) : [...prev, id];
-      });
-    },
-    [pushActivity],
-  );
+  const toggleLike = useCallback((id: string) => {
+    setLiked((prev) => {
+      const exists = prev.includes(id);
+      setListings((list) =>
+        list.map((l) =>
+          l.id === id ? { ...l, likes: Math.max(0, l.likes + (exists ? -1 : 1)) } : l,
+        ),
+      );
+      if (isSupabaseConfigured) {
+        void analyticsService.toggleLike(id).catch(() => undefined);
+      }
+      return exists ? prev.filter((v) => v !== id) : [...prev, id];
+    });
+  }, []);
 
   const markNotificationRead = useCallback(async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
@@ -691,7 +625,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     () => ({
       backendConfigured,
       schemaReady,
-      hasLiveListings,
+      listingsLoading,
+      listingsError,
       authLoading,
       university,
       setUniversity,
@@ -708,8 +643,6 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       setUser,
       signOutUser,
       refreshProfile,
-      rememberedAccounts,
-      registerAccount,
       listings,
       setListings,
       myListings,
@@ -721,10 +654,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       contacts,
       recordContact,
       recordView,
-      activities,
-      reports,
       reportListing,
-      resolveReport,
       notifications,
       unreadNotificationCount,
       refreshNotifications,
@@ -753,7 +683,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     [
       backendConfigured,
       schemaReady,
-      hasLiveListings,
+      listingsLoading,
+      listingsError,
       authLoading,
       university,
       myUniversity,
@@ -768,8 +699,6 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       setUser,
       signOutUser,
       refreshProfile,
-      rememberedAccounts,
-      registerAccount,
       listings,
       myListings,
       refreshMyListings,
@@ -780,10 +709,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       contacts,
       recordContact,
       recordView,
-      activities,
-      reports,
       reportListing,
-      resolveReport,
       notifications,
       unreadNotificationCount,
       refreshNotifications,

@@ -63,22 +63,23 @@ export const profileService = {
     if (authErr || !user) throw new Error("Authentication required");
 
     const sanitized: Record<string, unknown> = {};
-    if (input.full_name !== undefined) sanitized["full_name"] = input.full_name.trim();
+    if (input.full_name !== undefined) sanitized["full_name"] = input.full_name.trim().slice(0, 80);
     if (input.username !== undefined)
       sanitized["username"] = input.username
         .trim()
         .toLowerCase()
-        .replace(/[^a-z0-9_.-]/g, "");
+        .replace(/[^a-z0-9_.-]/g, "")
+        .slice(0, 40);
     if (input.phone_number !== undefined)
-      sanitized["phone_number"] = input.phone_number?.trim() || null;
+      sanitized["phone_number"] = input.phone_number?.trim().slice(0, 40) || null;
     if (input.whatsapp_number !== undefined)
-      sanitized["whatsapp_number"] = input.whatsapp_number?.trim() || null;
+      sanitized["whatsapp_number"] = input.whatsapp_number?.trim().slice(0, 40) || null;
     if (input.preferred_contact_method !== undefined)
       sanitized["preferred_contact_method"] = input.preferred_contact_method;
     if (input.show_public_contact !== undefined)
       sanitized["show_public_contact"] = input.show_public_contact;
     if (input.profile_image !== undefined) sanitized["profile_image"] = input.profile_image;
-    if (input.bio !== undefined) sanitized["bio"] = input.bio.trim();
+    if (input.bio !== undefined) sanitized["bio"] = input.bio.trim().slice(0, 600);
     if (input.account_type !== undefined) sanitized["account_type"] = input.account_type;
     if (input.primary_university_id !== undefined)
       sanitized["primary_university_id"] = input.primary_university_id;
@@ -156,7 +157,13 @@ export const profileService = {
     if (authErr || !user) throw new Error("Authentication required");
 
     const optimized = await compressImageFile(file, 720, 0.85);
-    const ext = optimized.name.split(".").pop()?.toLowerCase() || "jpg";
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/avif": "avif",
+    };
+    const ext = mimeToExt[optimized.type] || "jpg";
     const path = `${user.id}/avatar-${Date.now()}.${ext}`;
 
     const { error: uploadErr } = await supabase.storage

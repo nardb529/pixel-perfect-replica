@@ -30,7 +30,7 @@ import {
   AnimatedSelect,
   PagePendingFallback,
 } from "./shared";
-import { buildWhatsAppUrl, ownsListing, type Listing } from "@/lib/campus/data";
+import { buildWhatsAppUrl, isSafeMediaUrl, ownsListing, type Listing } from "@/lib/campus/data";
 import { listingService, profileService } from "@/services";
 import type { PublicSellerProfileRecord } from "@/lib/supabase/database.types";
 
@@ -39,12 +39,10 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     backendConfigured,
     authLoading,
     user,
-    setUser,
     signOutUser,
     refreshProfile,
     listings,
     myListings,
-    setListings,
     saved,
     liked,
     university,
@@ -139,7 +137,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   }
 
   const listing = listings.find((l) => l.id === sellerId || l.sellerId === sellerId);
-  if (sellerId && !remoteProfile && !listing) {
+  if (sellerId && (backendConfigured ? !remoteProfile : !listing)) {
     return (
       <Shell>
         <Empty title="Profile unavailable" text="This seller’s profile is no longer available." />
@@ -181,6 +179,8 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
         }
     : user;
 
+  const safeProfileAvatar = isSafeMediaUrl(profile?.avatar) ? profile?.avatar : undefined;
+
   const active = sellerId
     ? remoteListings.length > 0
       ? remoteListings.map((item) => ({ ...item, seller: profile?.name || item.seller }))
@@ -199,32 +199,29 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
   async function handleAvatarSelect(file?: File) {
     if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") return;
-    if (backendConfigured) {
-      setUploadingAvatar(true);
-      try {
-        const publicUrl = await profileService.uploadProfileImage(file);
-        setAvatar(publicUrl);
-        toast.success("Profile photo uploaded");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not upload profile photo");
-      } finally {
-        setUploadingAvatar(false);
-      }
+    if (!backendConfigured) {
+      toast.error("Backend storage is required to upload a profile photo.");
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setAvatar(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    setUploadingAvatar(true);
+    try {
+      const publicUrl = await profileService.uploadProfileImage(file);
+      setAvatar(publicUrl);
+      toast.success("Profile photo uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not upload profile photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!user) return;
+    if (!backendConfigured) {
+      toast.error("Profile updates require an active Supabase connection.");
+      return;
+    }
     const data = new FormData(e.currentTarget);
     const nextName = String(data.get("name")).trim() || user.name;
     const nextUsername = String(data.get("username") || user.username || "").trim();
@@ -232,29 +229,6 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     const nextBio = String(data.get("bio") || "");
     const nextContact = String(data.get("contact") || user.contact);
     const nextDetails = String(data.get("contactDetails") || "").trim();
-
-    if (!backendConfigured) {
-      const updated = {
-        ...user,
-        name: nextName,
-        username: nextUsername || undefined,
-        university: nextUni,
-        bio: nextBio,
-        contact: nextContact,
-        contactDetails: nextDetails || undefined,
-        avatar: avatar || user.avatar,
-      };
-      setUser(updated);
-      setListings((prev) =>
-        prev.map((l) =>
-          ownsListing(l, user.email)
-            ? { ...l, seller: updated.name, university: updated.university }
-            : l,
-        ),
-      );
-      setEditing(false);
-      return;
-    }
 
     setSavingProfile(true);
     try {
@@ -309,11 +283,11 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       <section className="surface-panel hero-panel profile-hero-panel curve-accent">
         <HeroAmbient />
         <div className="profile-top">
-          {profile?.avatar ? (
+          {safeProfileAvatar ? (
             <img
               className="profile-avatar"
-              src={profile.avatar}
-              alt={profile.name}
+              src={safeProfileAvatar}
+              alt={profile?.name || "Profile photo"}
               decoding="async"
             />
           ) : (
@@ -547,9 +521,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
         <DialogContent className="mobile-dialog onboarding-dialog">
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
-            {backendConfigured
-              ? "Update your storefront identity and campus contact details."
-              : "Update your display details for this session."}
+            Update your storefront identity and campus contact details.
           </DialogDescription>
           <form onSubmit={(e) => void save(e)}>
             <label className="form-field">
@@ -566,7 +538,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                 />
               </div>
             </label>
-            {avatar && (
+            {isSafeMediaUrl(avatar) && (
               <img className="profile-avatar mb-3" src={avatar} alt="Your new profile photo" />
             )}
             <div className="form-grid">

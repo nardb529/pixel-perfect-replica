@@ -1270,7 +1270,19 @@ grant select on public.public_seller_profiles to anon, authenticated;
 drop policy if exists "Public read seller university affiliations" on public.user_universities;
 create policy "Public read seller university affiliations"
   on public.user_universities for select
-  using (true);
+  using (
+    auth.uid() = user_id
+    or public.is_admin()
+    or exists (
+      select 1 from public.profiles p
+      where p.id = user_id
+        and p.is_suspended = false
+        and exists (
+          select 1 from public.listings l
+          where l.seller_id = user_id and l.status = 'Active'
+        )
+    )
+  );
 
 drop policy if exists "Users manage own university affiliations" on public.user_universities;
 create policy "Users manage own university affiliations"
@@ -1295,7 +1307,14 @@ drop policy if exists "Public views active listings; sellers view own; admins vi
 create policy "Public views active listings; sellers view own; admins view all"
   on public.listings for select
   using (
-    (status = 'Active' and (expires_at is null or expires_at > now()))
+    (
+      status = 'Active'
+      and (expires_at is null or expires_at > now())
+      and exists (
+        select 1 from public.profiles p
+        where p.id = seller_id and p.is_suspended = false
+      )
+    )
     or auth.uid() = seller_id
     or public.is_admin()
   );
@@ -1316,7 +1335,16 @@ drop policy if exists "Sellers update own listings; admins moderate" on public.l
 create policy "Sellers update own listings; admins moderate"
   on public.listings for update
   using (auth.uid() = seller_id or public.is_admin())
-  with check (auth.uid() = seller_id or public.is_admin());
+  with check (
+    public.is_admin()
+    or (
+      auth.uid() = seller_id
+      and exists (
+        select 1 from public.profiles p
+        where p.id = auth.uid() and p.is_suspended = false
+      )
+    )
+  );
 
 drop policy if exists "Sellers delete own listings; admins delete" on public.listings;
 create policy "Sellers delete own listings; admins delete"
@@ -1331,7 +1359,11 @@ create policy "Read images of visible listings"
     exists (
       select 1 from public.listings l
       where l.id = listing_id
-        and (l.status = 'Active' or l.seller_id = auth.uid() or public.is_admin())
+        and (
+          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          or l.seller_id = auth.uid()
+          or public.is_admin()
+        )
     )
   );
 
@@ -1341,13 +1373,21 @@ create policy "Sellers manage images on own listings"
   using (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   )
   with check (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   );
 
@@ -1359,7 +1399,11 @@ create policy "Read product_details of visible listings"
     exists (
       select 1 from public.listings l
       where l.id = listing_id
-        and (l.status = 'Active' or l.seller_id = auth.uid() or public.is_admin())
+        and (
+          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          or l.seller_id = auth.uid()
+          or public.is_admin()
+        )
     )
   );
 
@@ -1369,13 +1413,21 @@ create policy "Sellers manage product_details on own listings"
   using (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   )
   with check (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   );
 
@@ -1387,7 +1439,11 @@ create policy "Read service_details of visible listings"
     exists (
       select 1 from public.listings l
       where l.id = listing_id
-        and (l.status = 'Active' or l.seller_id = auth.uid() or public.is_admin())
+        and (
+          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          or l.seller_id = auth.uid()
+          or public.is_admin()
+        )
     )
   );
 
@@ -1397,13 +1453,21 @@ create policy "Sellers manage service_details on own listings"
   using (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   )
   with check (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   );
 
@@ -1415,7 +1479,11 @@ create policy "Read listing_universities of visible listings"
     exists (
       select 1 from public.listings l
       where l.id = listing_id
-        and (l.status = 'Active' or l.seller_id = auth.uid() or public.is_admin())
+        and (
+          (l.status = 'Active' and exists (select 1 from public.profiles p where p.id = l.seller_id and p.is_suspended = false))
+          or l.seller_id = auth.uid()
+          or public.is_admin()
+        )
     )
   );
 
@@ -1425,13 +1493,21 @@ create policy "Sellers manage university targets on own listings"
   using (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   )
   with check (
     exists (
       select 1 from public.listings l
-      where l.id = listing_id and (l.seller_id = auth.uid() or public.is_admin())
+      where l.id = listing_id
+        and (
+          public.is_admin()
+          or (l.seller_id = auth.uid() and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_suspended = false))
+        )
     )
   );
 
@@ -1461,13 +1537,18 @@ create policy "Sellers read own contact clicks; admins read all"
   on public.contact_clicks for select
   using (auth.uid() = seller_id or public.is_admin());
 
--- Reports: anyone (including anonymous buyer) can submit; only admins can view/update
+-- Reports: anyone (including anonymous buyer) can submit against active listings; only admins can view/update
 drop policy if exists "Anyone can submit a listing report" on public.reports;
 create policy "Anyone can submit a listing report"
   on public.reports for insert
   with check (
     (reporter_id is null or reporter_id = auth.uid())
     and listing_id is not null
+    and char_length(coalesce(description, '')) <= 1500
+    and exists (
+      select 1 from public.listings l
+      where l.id = listing_id and l.status = 'Active'
+    )
   );
 
 drop policy if exists "Admins view and manage reports" on public.reports;

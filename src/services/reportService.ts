@@ -18,7 +18,7 @@ export const reportService = {
       listing_id: input.listingId,
       reported_user_id: input.reportedUserId ?? null,
       reason: input.reason,
-      description: input.description?.trim() || "",
+      description: (input.description || "").trim().slice(0, 1500),
       status: "open",
     });
 

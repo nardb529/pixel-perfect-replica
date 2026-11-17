@@ -31,6 +31,7 @@ import {
   buildPhoneHref,
   buildWhatsAppUrl,
   formatListingPrice,
+  isSafeMediaUrl,
   type Listing,
 } from "@/lib/campus/data";
 import { listingService } from "@/services";
@@ -52,6 +53,7 @@ export function DetailPage({ id }: { id: string }) {
   const [loading, setLoading] = useState<boolean>(backendConfigured && !cachedListing);
   const [contact, setContact] = useState(false);
   const [report, setReport] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState<string>(REPORT_REASONS[1] ?? "Misleading listing");
   const [reportDescription, setReportDescription] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
@@ -112,7 +114,8 @@ export function DetailPage({ id }: { id: string }) {
     );
   }
 
-  const images = listing.images?.length ? listing.images : listing.image ? [listing.image] : [];
+  const rawImages = listing.images?.length ? listing.images : listing.image ? [listing.image] : [];
+  const images = rawImages.filter((url) => isSafeMediaUrl(url));
   const others = listings.filter(
     (l) =>
       l.id !== id &&
@@ -156,6 +159,8 @@ export function DetailPage({ id }: { id: string }) {
               src={images[imageIndex]}
               alt={listing.title}
               referrerPolicy="no-referrer"
+              loading="eager"
+              fetchPriority="high"
               decoding="async"
               width={1024}
               height={1024}
@@ -336,11 +341,7 @@ export function DetailPage({ id }: { id: string }) {
               <Check className="ml-auto" size={16} />
             </div>
             {phoneHref && (
-              <a
-                href={phoneHref}
-                onClick={() => recordContact(id, "Phone call")}
-                className="contact-method contact-method-link"
-              >
+              <a href={phoneHref} className="contact-method contact-method-link">
                 <Phone size={20} />
                 <div>
                   <strong>Call directly</strong>
@@ -358,7 +359,6 @@ export function DetailPage({ id }: { id: string }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => {
-                      recordContact(id, "WhatsApp");
                       toast.success(`Opening WhatsApp chat for ${listing.seller}`);
                       setContact(false);
                     }}
@@ -383,8 +383,12 @@ export function DetailPage({ id }: { id: string }) {
               <Button
                 variant="outline"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(enquiryText);
-                  toast.success("Message copied");
+                  try {
+                    await navigator.clipboard.writeText(enquiryText);
+                    toast.success("Message copied");
+                  } catch {
+                    toast.error("Could not copy enquiry automatically");
+                  }
                 }}
               >
                 <Copy size={16} />
@@ -416,19 +420,32 @@ export function DetailPage({ id }: { id: string }) {
               <span>Additional details (optional)</span>
               <textarea
                 placeholder="Describe what happened or what seems suspicious..."
+                maxLength={1500}
                 value={reportDescription}
                 onChange={(e) => setReportDescription(e.target.value)}
               />
             </label>
             <Button
-              onClick={() => {
-                reportListing(id, reason, reportDescription);
-                toast.success("Report submitted");
-                setReportDescription("");
-                setReport(false);
+              disabled={reporting}
+              onClick={async () => {
+                setReporting(true);
+                try {
+                  const ok = await reportListing(id, reason, reportDescription);
+                  if (!ok) {
+                    toast.error("Report submission is unavailable while backend is disconnected.");
+                    return;
+                  }
+                  toast.success("Report submitted for moderation review");
+                  setReportDescription("");
+                  setReport(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Could not submit report.");
+                } finally {
+                  setReporting(false);
+                }
               }}
             >
-              Submit report
+              {reporting ? "Submitting..." : "Submit report"}
             </Button>
           </div>
         </DialogContent>

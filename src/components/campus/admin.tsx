@@ -41,12 +41,6 @@ import {
   AnimatedSelect,
   SectionTitle,
 } from "./shared";
-import {
-  universities as fallbackUniversities,
-  productCategories as fallbackProductCategories,
-  serviceCategories as fallbackServiceCategories,
-  type Listing,
-} from "@/lib/campus/data";
 import { isSchemaMissingError } from "@/lib/supabase/client";
 import { adminService, categoryService, universityService } from "@/services";
 import type { AdminListingSummary, ModerationLogRecord } from "@/services/adminService";
@@ -92,22 +86,6 @@ type RoleTarget = {
   nextRole: UserRole;
 };
 
-type LocalUniversity = {
-  id: string;
-  university_name: string;
-  short_name: string;
-  region: string;
-  location: string;
-  is_active: boolean;
-};
-
-type LocalCategory = {
-  id: string;
-  name: string;
-  category_type: CategoryType;
-  is_active: boolean;
-};
-
 const NAV_ITEMS: Array<{ id: AdminSectionId; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "listings", label: "Listings", icon: ShoppingBag },
@@ -148,12 +126,7 @@ function formatDateTime(value: string) {
 export function AdminPage() {
   const {
     backendConfigured,
-    schemaReady,
     authLoading,
-    listings,
-    setListings,
-    reports,
-    resolveReport,
     user,
     refreshMetadata,
     refreshListings,
@@ -173,35 +146,6 @@ export function AdminPage() {
   const [adminCategories, setAdminCategories] = useState<CategoryRecord[]>([]);
   const [promotionConfigs, setPromotionConfigs] = useState<PromotionConfigRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<ModerationLogRecord[]>([]);
-
-  // Local preview fallback state when Supabase is not connected
-  const [localAudit, setLocalAudit] = useState<ModerationLogRecord[]>([]);
-  const [localVerifiedIds, setLocalVerifiedIds] = useState<string[]>([]);
-  const [localSuspendedIds, setLocalSuspendedIds] = useState<string[]>([]);
-  const [localUnis, setLocalUnis] = useState<LocalUniversity[]>(() =>
-    fallbackUniversities.map((u, idx) => ({
-      id: `local-uni-${idx}`,
-      university_name: u,
-      short_name: u,
-      region: "Ghana",
-      location: "Campus",
-      is_active: true,
-    })),
-  );
-  const [localCats, setLocalCats] = useState<LocalCategory[]>(() => [
-    ...fallbackProductCategories.map((c, idx) => ({
-      id: `local-p-${idx}`,
-      name: c,
-      category_type: "product" as const,
-      is_active: true,
-    })),
-    ...fallbackServiceCategories.map((c, idx) => ({
-      id: `local-s-${idx}`,
-      name: c,
-      category_type: "service" as const,
-      is_active: true,
-    })),
-  ]);
 
   // Filters
   const [listingSearch, setListingSearch] = useState("");
@@ -253,25 +197,7 @@ export function AdminPage() {
   const [newPromoFee, setNewPromoFee] = useState("25");
   const [newPromoDesc, setNewPromoDesc] = useState("");
 
-  const isAdminUser = user?.role === "admin";
-
-  const pushLocalLog = useCallback(
-    (action: string, targetType: string, targetId: string, notes?: string) => {
-      setLocalAudit((prev) => [
-        {
-          id: crypto.randomUUID(),
-          admin_id: user?.id || "local-admin",
-          action,
-          target_type: targetType,
-          target_id: targetId,
-          notes: notes ?? null,
-          created_at: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-    },
-    [user?.id],
-  );
+  const isAdminUser = user?.role === "admin" && !user?.isSuspended;
 
   const loadAdminWorkspace = useCallback(async () => {
     if (!backendConfigured || !isAdminUser) return;
@@ -300,7 +226,7 @@ export function AdminPage() {
     } catch (err) {
       if (isSchemaMissingError(err)) {
         setWorkspaceError(
-          "Your Supabase database tables have not been created yet. Run the SQL migrations in Supabase SQL Editor to activate live administration.",
+          "Your Supabase database tables have not been created yet. Run the SQL setup script in Supabase SQL Editor to activate live administration.",
         );
       } else {
         const message = err instanceof Error ? err.message : "Failed to load admin records";
@@ -324,9 +250,8 @@ export function AdminPage() {
   const listingTitleMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of adminListings) map.set(item.id, item.title);
-    for (const item of listings) map.set(item.id, item.title);
     return map;
-  }, [adminListings, listings]);
+  }, [adminListings]);
 
   const filteredLiveListings = useMemo(() => {
     const q = listingSearch.trim().toLowerCase();
@@ -354,21 +279,6 @@ export function AdminPage() {
     categoryMap,
   ]);
 
-  const filteredOfflineListings = useMemo(() => {
-    const q = listingSearch.trim().toLowerCase();
-    return listings.filter((item) => {
-      if (listingStatusFilter !== "All" && item.status !== listingStatusFilter) return false;
-      if (listingTypeFilter !== "all" && item.type !== listingTypeFilter) return false;
-      if (listingFeaturedOnly && !item.featured) return false;
-      if (!q) return true;
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.seller.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q)
-      );
-    });
-  }, [listings, listingSearch, listingStatusFilter, listingTypeFilter, listingFeaturedOnly]);
-
   const filteredReports = useMemo(() => {
     if (reportFilter === "all") return adminReports;
     return adminReports.filter((r) => r.status === reportFilter);
@@ -390,33 +300,6 @@ export function AdminPage() {
       );
     });
   }, [adminProfiles, userSearch, userFilter]);
-
-  const offlineUsers = useMemo(() => {
-    const map = new Map<
-      string,
-      { id: string; name: string; university: string; role: UserRole; email?: string }
-    >();
-    for (const l of listings) {
-      if (!map.has(l.seller)) {
-        map.set(l.seller, {
-          id: l.seller,
-          name: l.seller,
-          university: l.university,
-          role: "user",
-        });
-      }
-    }
-    if (user) {
-      map.set(user.email, {
-        id: user.id || user.email,
-        name: user.name,
-        university: user.university,
-        role: user.role || "admin",
-        email: user.email,
-      });
-    }
-    return Array.from(map.values());
-  }, [listings, user]);
 
   const broadcastTargets = useMemo(() => {
     if (!backendConfigured) return [];
@@ -440,10 +323,14 @@ export function AdminPage() {
   }, [backendConfigured, broadcastScope, broadcastUniId, broadcastUserId, adminProfiles]);
 
   if (authLoading) {
-    return <PagePendingFallback />;
+    return (
+      <Shell>
+        <PagePendingFallback />
+      </Shell>
+    );
   }
 
-  if (backendConfigured && !isAdminUser) {
+  if (!isAdminUser) {
     return (
       <Shell>
         <section className="surface-panel hero-panel curve-accent">
@@ -453,8 +340,8 @@ export function AdminPage() {
               <span className="section-kicker">Restricted Console</span>
               <h1>Admin authorization required</h1>
               <p>
-                This command center is reserved for accounts assigned the platform administrator
-                role.
+                This command center is reserved for active accounts assigned the platform
+                administrator role.
               </p>
             </div>
             <Button variant="outline" asChild>
@@ -464,9 +351,11 @@ export function AdminPage() {
           <Empty
             title="Access restricted"
             text={
-              user
-                ? `Signed in as ${user.email} (standard member). Return to your seller dashboard or sign in with an administrator account.`
-                : "Sign in with an administrator account to access CampusLoop platform controls."
+              user?.isSuspended
+                ? `Signed in as ${user.email}. This account is currently suspended.`
+                : user
+                  ? `Signed in as ${user.email} (standard member). Return to your seller dashboard or sign in with an administrator account.`
+                  : "Sign in with an administrator account to access CampusLoop platform controls."
             }
           >
             <Button asChild>
@@ -480,55 +369,55 @@ export function AdminPage() {
     );
   }
 
+  if (!backendConfigured) {
+    return (
+      <Shell>
+        <section className="surface-panel hero-panel curve-accent">
+          <HeroAmbient />
+          <Empty
+            title="Live admin service unavailable"
+            text="Administrator controls require an active backend connection."
+          >
+            <Button asChild>
+              <Link to="/discover">Back to marketplace</Link>
+            </Button>
+          </Empty>
+        </section>
+      </Shell>
+    );
+  }
+
   // Derived overview counts
-  const openReportCount = backendConfigured
-    ? (summary?.open_reports ??
-      adminReports.filter((r) => r.status === "open" || r.status === "reviewing").length)
-    : reports.filter((r) => !r.resolved).length;
+  const openReportCount =
+    summary?.open_reports ??
+    adminReports.filter((r) => r.status === "open" || r.status === "reviewing").length;
 
-  const verifiedSellerCount = backendConfigured
-    ? adminProfiles.filter((p) => p.verification_status === "verified").length
-    : localVerifiedIds.length;
+  const verifiedSellerCount = adminProfiles.filter(
+    (p) => p.verification_status === "verified",
+  ).length;
 
-  const pendingVerificationCount = backendConfigured
-    ? adminProfiles.filter((p) => p.verification_status === "pending").length
-    : 0;
+  const pendingVerificationCount = adminProfiles.filter(
+    (p) => p.verification_status === "pending",
+  ).length;
 
-  const totalSellersCount = backendConfigured
-    ? (summary?.total_sellers ?? adminProfiles.length)
-    : offlineUsers.length;
+  const totalSellersCount = summary?.total_sellers ?? adminProfiles.length;
 
-  const activeListingsCount = backendConfigured
-    ? (summary?.active_listings ?? adminListings.filter((l) => l.status === "Active").length)
-    : listings.filter((l) => l.status === "Active").length;
+  const activeListingsCount =
+    summary?.active_listings ?? adminListings.filter((l) => l.status === "Active").length;
 
-  const productListingsCount = backendConfigured
-    ? (summary?.total_products ??
-      adminListings.filter((l) => l.status === "Active" && l.listing_type === "product").length)
-    : listings.filter((l) => l.status === "Active" && l.type === "product").length;
+  const productListingsCount =
+    summary?.total_products ??
+    adminListings.filter((l) => l.status === "Active" && l.listing_type === "product").length;
 
-  const serviceListingsCount = backendConfigured
-    ? (summary?.total_services ??
-      adminListings.filter((l) => l.status === "Active" && l.listing_type === "service").length)
-    : listings.filter((l) => l.status === "Active" && l.type === "service").length;
+  const serviceListingsCount =
+    summary?.total_services ??
+    adminListings.filter((l) => l.status === "Active" && l.listing_type === "service").length;
 
-  const totalClicksCount = backendConfigured
-    ? (summary?.total_contact_clicks ??
-      adminListings.reduce((sum, l) => sum + (l.contact_click_count || 0), 0))
-    : listings.reduce((sum, l) => sum + (l.contactClicks || 0), 0);
+  const totalClicksCount =
+    summary?.total_contact_clicks ??
+    adminListings.reduce((sum, l) => sum + (l.contact_click_count || 0), 0);
 
-  const uniDistribution =
-    backendConfigured && summary?.university_distribution?.length
-      ? summary.university_distribution
-      : fallbackUniversities.slice(0, 8).map((u) => ({
-          id: u,
-          short_name: u,
-          university_name: u,
-          targeted_listings: listings.filter(
-            (l) => l.audience.includes("All Universities") || l.audience.includes(u),
-          ).length,
-        }));
-
+  const uniDistribution = summary?.university_distribution ?? [];
   const maxUniCount = Math.max(1, ...uniDistribution.map((u) => u.targeted_listings));
 
   // Action handlers
@@ -538,24 +427,6 @@ export function AdminPage() {
     nextStatus: ListingStatus,
     note?: string,
   ) {
-    if (!backendConfigured) {
-      const previewStatus: Listing["status"] =
-        nextStatus === "Active" ||
-        nextStatus === "Paused" ||
-        nextStatus === "Sold" ||
-        nextStatus === "Unavailable"
-          ? nextStatus
-          : "Paused";
-      setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status: previewStatus } : l)));
-      pushLocalLog(
-        `listing_status_${nextStatus.toLowerCase()}`,
-        "listing",
-        id,
-        `${title}${note ? ` — ${note}` : ""}`,
-      );
-      toast.success(`${title} marked as ${nextStatus}`);
-      return;
-    }
     try {
       await adminService.moderateListing(id, nextStatus, note || "Updated by admin moderation");
       toast.success(`${title} marked as ${nextStatus}`);
@@ -580,13 +451,6 @@ export function AdminPage() {
 
   async function handleConfirmDeleteListing() {
     if (!deleteTarget) return;
-    if (!backendConfigured) {
-      setListings((prev) => prev.filter((l) => l.id !== deleteTarget.id));
-      pushLocalLog("listing_deleted", "listing", deleteTarget.id, deleteTarget.title);
-      toast.success("Listing removed");
-      setDeleteTarget(null);
-      return;
-    }
     try {
       await adminService.deleteListing(deleteTarget.id, `Removed “${deleteTarget.title}”`);
       toast.success("Listing permanently removed");
@@ -598,12 +462,6 @@ export function AdminPage() {
   }
 
   async function handleToggleFeatured(id: string, title: string, nextFeatured: boolean) {
-    if (!backendConfigured) {
-      setListings((prev) => prev.map((l) => (l.id === id ? { ...l, featured: nextFeatured } : l)));
-      pushLocalLog(nextFeatured ? "listing_featured" : "listing_unfeatured", "listing", id, title);
-      toast.success(nextFeatured ? "Marked as featured" : "Removed from featured");
-      return;
-    }
     try {
       await adminService.toggleFeaturedListing(id, nextFeatured);
       toast.success(nextFeatured ? "Marked as featured" : "Removed from featured");
@@ -614,12 +472,6 @@ export function AdminPage() {
   }
 
   async function handleReportAction(repId: string, nextStatus: ReportStatus, note?: string) {
-    if (!backendConfigured) {
-      resolveReport(repId);
-      pushLocalLog(`report_${nextStatus}`, "report", repId, note);
-      toast.success(`Report marked ${nextStatus}`);
-      return;
-    }
     try {
       await adminService.resolveReport(repId, nextStatus, note || `Marked ${nextStatus} by admin`);
       toast.success(`Report marked ${nextStatus}`);
@@ -661,14 +513,6 @@ export function AdminPage() {
 
   async function handleUniversityLogoUpload(file?: File) {
     if (!file) return;
-    if (!backendConfigured) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") setNewUniLogoUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
-      return;
-    }
     setUploadingLogo(true);
     try {
       const slug = (newUniShort || newUniName || "campus")
@@ -714,39 +558,6 @@ export function AdminPage() {
       .trim()
       .replace(/[^a-z0-9]+/g, "-");
 
-    if (!backendConfigured) {
-      setLocalUnis((prev) => {
-        if (editingUniId) {
-          return prev.map((u) =>
-            u.id === editingUniId
-              ? {
-                  ...u,
-                  university_name: newUniName.trim(),
-                  short_name: newUniShort.trim(),
-                  location: newUniLocation.trim() || "Campus",
-                  region: newUniRegion.trim() || "Ghana",
-                }
-              : u,
-          );
-        }
-        return [
-          {
-            id: crypto.randomUUID(),
-            university_name: newUniName.trim(),
-            short_name: newUniShort.trim(),
-            location: newUniLocation.trim() || "Campus",
-            region: newUniRegion.trim() || "Ghana",
-            is_active: true,
-          },
-          ...prev,
-        ];
-      });
-      pushLocalLog("university_saved", "university", slug, newUniShort);
-      toast.success("University saved");
-      resetUniversityForm();
-      return;
-    }
-
     try {
       await adminService.upsertUniversity({
         id: editingUniId,
@@ -787,22 +598,6 @@ export function AdminPage() {
     if (!newCatName.trim()) return;
     const slug = `${newCatType}-${newCatName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
-    if (!backendConfigured) {
-      setLocalCats((prev) => [
-        {
-          id: crypto.randomUUID(),
-          name: newCatName.trim(),
-          category_type: newCatType,
-          is_active: true,
-        },
-        ...prev,
-      ]);
-      pushLocalLog("category_saved", "category", slug, newCatName);
-      toast.success("Category saved");
-      resetCategoryForm();
-      return;
-    }
-
     try {
       await adminService.upsertCategory({
         id: editingCatId,
@@ -823,19 +618,6 @@ export function AdminPage() {
   async function handleSendBroadcast(e: FormEvent) {
     e.preventDefault();
     if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
-
-    if (!backendConfigured) {
-      pushLocalLog(
-        "platform_broadcast",
-        "notifications",
-        broadcastScope,
-        `${broadcastTitle.trim()} (${broadcastScope})`,
-      );
-      toast.success("Preview announcement logged");
-      setBroadcastTitle("");
-      setBroadcastMessage("");
-      return;
-    }
 
     if (broadcastTargets.length === 0) {
       toast.error("No matching active recipients for this target scope.");
@@ -888,8 +670,6 @@ export function AdminPage() {
     }
   }
 
-  const effectiveLogs = backendConfigured ? auditLogs : localAudit;
-
   return (
     <Shell>
       {/* Executive Command Header */}
@@ -901,28 +681,24 @@ export function AdminPage() {
               <Shield size={24} strokeWidth={2.2} />
             </span>
             <div>
-              <span className="admin-eyebrow">
-                CampusLoop Command Center · {backendConfigured ? "Live Control" : "Preview Mode"}
-              </span>
+              <span className="admin-eyebrow">CampusLoop Command Center · Live Control</span>
               <h1>Platform Administration</h1>
               <p>
-                Signed in as <strong>{user?.email || "Administrator preview"}</strong> — full
-                oversight across listings, sellers, campuses, reports, and announcements.
+                Signed in as <strong>{user.email}</strong> — full oversight across listings,
+                sellers, campuses, reports, and announcements.
               </p>
             </div>
           </div>
           <div className="admin-hero-actions">
-            {backendConfigured && (
-              <Button
-                variant="outline"
-                className="whitespace-nowrap shrink-0"
-                onClick={() => void loadAdminWorkspace()}
-                disabled={loadingAdmin}
-              >
-                <RefreshCw size={15} className={loadingAdmin ? "animate-spin" : ""} />
-                Refresh
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              className="whitespace-nowrap shrink-0"
+              onClick={() => void loadAdminWorkspace()}
+              disabled={loadingAdmin}
+            >
+              <RefreshCw size={15} className={loadingAdmin ? "animate-spin" : ""} />
+              Refresh
+            </Button>
             <Button
               variant="outline"
               className="whitespace-nowrap shrink-0"
@@ -1000,9 +776,7 @@ export function AdminPage() {
                   : item.id === "users"
                     ? pendingVerificationCount
                     : item.id === "listings"
-                      ? backendConfigured
-                        ? adminListings.filter((l) => l.status === "Paused").length
-                        : 0
+                      ? adminListings.filter((l) => l.status === "Paused").length
                       : 0;
               return (
                 <button
@@ -1034,7 +808,7 @@ export function AdminPage() {
         </aside>
 
         <section className="surface-panel admin-content-panel">
-          {backendConfigured && loadingAdmin && adminListings.length === 0 ? (
+          {loadingAdmin && adminListings.length === 0 ? (
             <div className="py-8">
               <PagePendingFallback />
             </div>
@@ -1119,9 +893,7 @@ export function AdminPage() {
                       <div>
                         <strong>Manage universities &amp; categories</strong>
                         <small className="tabular-nums">
-                          {backendConfigured ? adminUniversities.length : localUnis.length} campuses
-                          · {backendConfigured ? adminCategories.length : localCats.length}{" "}
-                          categories
+                          {adminUniversities.length} campuses · {adminCategories.length} categories
                         </small>
                       </div>
                       <ArrowUpRight size={16} />
@@ -1149,9 +921,9 @@ export function AdminPage() {
                     Full log
                   </button>
                 </div>
-                {effectiveLogs.length ? (
+                {auditLogs.length ? (
                   <div className="admin-log-list">
-                    {effectiveLogs.slice(0, 6).map((log) => (
+                    {auditLogs.slice(0, 6).map((log) => (
                       <div className="admin-log-row" key={log.id}>
                         <span className="admin-log-action">{log.action.replace(/_/g, " ")}</span>
                         <span className="admin-log-note">
@@ -1173,8 +945,7 @@ export function AdminPage() {
             <div className="admin-section-stack">
               <SectionTitle eyebrow="Catalog Control" title="All Marketplace Listings">
                 <span className="tabular-nums text-xs text-muted-foreground">
-                  {backendConfigured ? filteredLiveListings.length : filteredOfflineListings.length}{" "}
-                  shown
+                  {filteredLiveListings.length} shown
                 </span>
               </SectionTitle>
 
@@ -1217,154 +988,98 @@ export function AdminPage() {
                 </Button>
               </div>
 
-              {backendConfigured ? (
-                filteredLiveListings.length ? (
-                  <div className="admin-list">
-                    {filteredLiveListings.map((item) => {
-                      const seller = profileMap.get(item.seller_id);
-                      const cat = categoryMap.get(item.category_id);
-                      return (
-                        <article className="admin-card-row" key={item.id}>
-                          <div className="admin-row-main">
-                            <div className="admin-row-title">
-                              <Link to="/listing/$id" params={{ id: item.id }}>
-                                <strong>{item.title}</strong>
-                              </Link>
-                              <Link
-                                to="/listing/$id"
-                                params={{ id: item.id }}
-                                aria-label={`Open ${item.title}`}
-                                className="text-muted-foreground hover:text-primary"
-                              >
-                                <ExternalLink size={13} />
-                              </Link>
-                            </div>
-                            <small className="tabular-nums">
-                              {item.listing_type}
-                              {cat ? ` · ${cat.name}` : ""}
-                              {item.price !== null ? ` · GH₵ ${item.price}` : ""}
-                              {seller ? ` · ${seller.full_name}` : ""}
-                              {" · "}
-                              <span
-                                className={
-                                  item.status === "Active"
-                                    ? "status-text-success"
-                                    : item.status === "Rejected"
-                                      ? "status-text-danger"
-                                      : "status-text-warning"
-                                }
-                              >
-                                {item.status}
-                              </span>
-                              {item.is_featured ? " · Featured" : ""}
-                              {` · ${item.view_count} views · ${item.contact_click_count} clicks`}
-                            </small>
+              {filteredLiveListings.length ? (
+                <div className="admin-list">
+                  {filteredLiveListings.map((item) => {
+                    const seller = profileMap.get(item.seller_id);
+                    const cat = categoryMap.get(item.category_id);
+                    return (
+                      <article className="admin-card-row" key={item.id}>
+                        <div className="admin-row-main">
+                          <div className="admin-row-title">
+                            <Link to="/listing/$id" params={{ id: item.id }}>
+                              <strong>{item.title}</strong>
+                            </Link>
+                            <Link
+                              to="/listing/$id"
+                              params={{ id: item.id }}
+                              aria-label={`Open ${item.title}`}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <ExternalLink size={13} />
+                            </Link>
                           </div>
-                          <div className="admin-card-action">
-                            <Button
-                              variant={item.is_featured ? "default" : "outline"}
-                              size="sm"
-                              className="whitespace-nowrap shrink-0"
-                              onClick={() =>
-                                void handleToggleFeatured(item.id, item.title, !item.is_featured)
+                          <small className="tabular-nums">
+                            {item.listing_type}
+                            {cat ? ` · ${cat.name}` : ""}
+                            {item.price !== null ? ` · GH₵ ${item.price}` : ""}
+                            {seller ? ` · ${seller.full_name}` : ""}
+                            {" · "}
+                            <span
+                              className={
+                                item.status === "Active"
+                                  ? "status-text-success"
+                                  : item.status === "Rejected"
+                                    ? "status-text-danger"
+                                    : "status-text-warning"
                               }
                             >
-                              <Star size={14} />
-                              {item.is_featured ? "Featured" : "Feature"}
-                            </Button>
+                              {item.status}
+                            </span>
+                            {item.is_featured ? " · Featured" : ""}
+                            {` · ${item.view_count} views · ${item.contact_click_count} clicks`}
+                          </small>
+                        </div>
+                        <div className="admin-card-action">
+                          <Button
+                            variant={item.is_featured ? "default" : "outline"}
+                            size="sm"
+                            className="whitespace-nowrap shrink-0"
+                            onClick={() =>
+                              void handleToggleFeatured(item.id, item.title, !item.is_featured)
+                            }
+                          >
+                            <Star size={14} />
+                            {item.is_featured ? "Featured" : "Feature"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="whitespace-nowrap shrink-0"
+                            onClick={() =>
+                              void handleListingStatus(
+                                item.id,
+                                item.title,
+                                item.status === "Active" ? "Paused" : "Active",
+                              )
+                            }
+                          >
+                            {item.status === "Active" ? <EyeOff size={14} /> : <Eye size={14} />}
+                            {item.status === "Active" ? "Pause" : "Approve"}
+                          </Button>
+                          {item.status !== "Rejected" && (
                             <Button
                               variant="outline"
                               size="sm"
                               className="whitespace-nowrap shrink-0"
-                              onClick={() =>
-                                void handleListingStatus(
-                                  item.id,
-                                  item.title,
-                                  item.status === "Active" ? "Paused" : "Active",
-                                )
-                              }
+                              onClick={() => setRejectTarget({ id: item.id, title: item.title })}
                             >
-                              {item.status === "Active" ? <EyeOff size={14} /> : <Eye size={14} />}
-                              {item.status === "Active" ? "Pause" : "Approve"}
+                              <Ban size={14} />
+                              Reject
                             </Button>
-                            {item.status !== "Rejected" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="whitespace-nowrap shrink-0"
-                                onClick={() => setRejectTarget({ id: item.id, title: item.title })}
-                              >
-                                <Ban size={14} />
-                                Reject
-                              </Button>
-                            )}
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              aria-label={`Delete ${item.title}`}
-                              onClick={() => setDeleteTarget({ id: item.id, title: item.title })}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Empty title="No matching listings" text="Adjust your search or status filter." />
-                )
-              ) : filteredOfflineListings.length ? (
-                <div className="admin-list">
-                  {filteredOfflineListings.map((item) => (
-                    <article className="admin-card-row" key={item.id}>
-                      <div className="admin-row-main">
-                        <div className="admin-row-title">
-                          <Link to="/listing/$id" params={{ id: item.id }}>
-                            <strong>{item.title}</strong>
-                          </Link>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            aria-label={`Delete ${item.title}`}
+                            onClick={() => setDeleteTarget({ id: item.id, title: item.title })}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
                         </div>
-                        <small className="tabular-nums">
-                          {item.type} · {item.category} · {item.seller} · {item.status}
-                          {item.featured ? " · Featured" : ""}
-                        </small>
-                      </div>
-                      <div className="admin-card-action">
-                        <Button
-                          variant={item.featured ? "default" : "outline"}
-                          size="sm"
-                          onClick={() =>
-                            void handleToggleFeatured(item.id, item.title, !item.featured)
-                          }
-                        >
-                          <Star size={14} />
-                          {item.featured ? "Featured" : "Feature"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            void handleListingStatus(
-                              item.id,
-                              item.title,
-                              item.status === "Active" ? "Paused" : "Active",
-                            )
-                          }
-                        >
-                          {item.status === "Active" ? <EyeOff size={14} /> : <Eye size={14} />}
-                          {item.status === "Active" ? "Pause" : "Approve"}
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          aria-label={`Delete ${item.title}`}
-                          onClick={() => setDeleteTarget({ id: item.id, title: item.title })}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               ) : (
                 <Empty title="No matching listings" text="Adjust your search or status filter." />
@@ -1388,139 +1103,109 @@ export function AdminPage() {
                 />
               </SectionTitle>
 
-              {backendConfigured ? (
-                filteredReports.length ? (
-                  <div className="admin-list">
-                    {filteredReports.map((rep) => {
-                      const reportedTitle = rep.listing_id
-                        ? listingTitleMap.get(rep.listing_id) || "Reported listing"
-                        : "Account report";
-                      return (
-                        <article className="admin-card-row" key={rep.id}>
-                          <div className="admin-row-main">
-                            <div className="admin-row-title">
-                              <strong>{rep.reason}</strong>
-                              {rep.listing_id && (
-                                <Link
-                                  to="/listing/$id"
-                                  params={{ id: rep.listing_id }}
-                                  className="text-link text-xs"
-                                >
-                                  View listing <ExternalLink size={12} />
-                                </Link>
-                              )}
-                            </div>
-                            <small className="tabular-nums">
-                              {reportedTitle} ·{" "}
-                              <span
-                                className={
-                                  rep.status === "resolved" || rep.status === "dismissed"
-                                    ? "status-text-success"
-                                    : "status-text-danger"
-                                }
-                              >
-                                {rep.status}
-                              </span>{" "}
-                              · {formatShortDate(rep.created_at)}
-                              {rep.description ? ` · ${rep.description}` : ""}
-                            </small>
-                          </div>
-                          <div className="admin-card-action">
+              {filteredReports.length ? (
+                <div className="admin-list">
+                  {filteredReports.map((rep) => {
+                    const reportedTitle = rep.listing_id
+                      ? listingTitleMap.get(rep.listing_id) || "Reported listing"
+                      : "Account report";
+                    return (
+                      <article className="admin-card-row" key={rep.id}>
+                        <div className="admin-row-main">
+                          <div className="admin-row-title">
+                            <strong>{rep.reason}</strong>
                             {rep.listing_id && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="whitespace-nowrap shrink-0"
-                                onClick={() =>
-                                  void handleListingStatus(
-                                    rep.listing_id!,
-                                    reportedTitle,
-                                    "Paused",
-                                    `Paused due to report: ${rep.reason}`,
-                                  )
-                                }
+                              <Link
+                                to="/listing/$id"
+                                params={{ id: rep.listing_id }}
+                                className="text-link text-xs"
                               >
-                                <EyeOff size={14} />
-                                Pause listing
-                              </Button>
+                                View listing <ExternalLink size={12} />
+                              </Link>
                             )}
-                            {rep.status === "open" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="whitespace-nowrap shrink-0"
-                                onClick={() => void handleReportAction(rep.id, "reviewing")}
-                              >
-                                Reviewing
-                              </Button>
-                            )}
+                          </div>
+                          <small className="tabular-nums">
+                            {reportedTitle} ·{" "}
+                            <span
+                              className={
+                                rep.status === "resolved" || rep.status === "dismissed"
+                                  ? "status-text-success"
+                                  : "status-text-danger"
+                              }
+                            >
+                              {rep.status}
+                            </span>{" "}
+                            · {formatShortDate(rep.created_at)}
+                            {rep.description ? ` · ${rep.description}` : ""}
+                          </small>
+                        </div>
+                        <div className="admin-card-action">
+                          {rep.listing_id && (
                             <Button
-                              variant={rep.status === "resolved" ? "secondary" : "default"}
+                              variant="outline"
                               size="sm"
                               className="whitespace-nowrap shrink-0"
                               onClick={() =>
-                                void handleReportAction(
-                                  rep.id,
-                                  rep.status === "resolved" ? "open" : "resolved",
+                                void handleListingStatus(
+                                  rep.listing_id!,
+                                  reportedTitle,
+                                  "Paused",
+                                  `Paused due to report: ${rep.reason}`,
                                 )
                               }
                             >
-                              <Check size={14} />
-                              {rep.status === "resolved" ? "Reopen" : "Resolve"}
+                              <EyeOff size={14} />
+                              Pause listing
                             </Button>
-                            {rep.status !== "dismissed" && rep.status !== "resolved" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="whitespace-nowrap shrink-0"
-                                onClick={() => void handleReportAction(rep.id, "dismissed")}
-                              >
-                                Dismiss
-                              </Button>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Empty title="No matching reports" text="All clear in this queue." />
-                )
-              ) : reports.length ? (
-                <div className="admin-list">
-                  {reports.map((rep) => (
-                    <article className="admin-card-row" key={rep.id}>
-                      <div className="admin-row-main">
-                        <strong>{rep.reason}</strong>
-                        <small>
-                          {listingTitleMap.get(rep.listingId) || "Listing"} ·{" "}
-                          {rep.resolved ? "Resolved" : "Open"}
-                        </small>
-                      </div>
-                      <div className="admin-card-action">
-                        <Button
-                          variant={rep.resolved ? "secondary" : "outline"}
-                          size="sm"
-                          onClick={() =>
-                            void handleReportAction(rep.id, rep.resolved ? "open" : "resolved")
-                          }
-                        >
-                          <Check size={14} />
-                          {rep.resolved ? "Resolved" : "Resolve"}
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
+                          )}
+                          {rep.status === "open" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="whitespace-nowrap shrink-0"
+                              onClick={() => void handleReportAction(rep.id, "reviewing")}
+                            >
+                              Reviewing
+                            </Button>
+                          )}
+                          <Button
+                            variant={rep.status === "resolved" ? "secondary" : "default"}
+                            size="sm"
+                            className="whitespace-nowrap shrink-0"
+                            onClick={() =>
+                              void handleReportAction(
+                                rep.id,
+                                rep.status === "resolved" ? "open" : "resolved",
+                              )
+                            }
+                          >
+                            <Check size={14} />
+                            {rep.status === "resolved" ? "Reopen" : "Resolve"}
+                          </Button>
+                          {rep.status !== "dismissed" && rep.status !== "resolved" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="whitespace-nowrap shrink-0"
+                              onClick={() => void handleReportAction(rep.id, "dismissed")}
+                            >
+                              Dismiss
+                            </Button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               ) : (
-                <Empty title="No open reports" text="Reported listings will appear here." />
+                <Empty title="No matching reports" text="All clear in this queue." />
               )}
             </div>
           ) : section === "users" ? (
             <div className="admin-section-stack">
               <SectionTitle eyebrow="Accounts & Trust" title="Users, Verification & Roles">
                 <span className="tabular-nums text-xs text-muted-foreground">
-                  {backendConfigured ? filteredProfiles.length : offlineUsers.length} accounts
+                  {filteredProfiles.length} accounts
                 </span>
               </SectionTitle>
 
@@ -1550,191 +1235,139 @@ export function AdminPage() {
                 />
               </div>
 
-              {backendConfigured ? (
-                filteredProfiles.length ? (
-                  <div className="admin-list">
-                    {filteredProfiles.map((prof) => {
-                      const isSelf = prof.id === user?.id;
-                      const isVerified = prof.verification_status === "verified";
-                      return (
-                        <article className="admin-card-row" key={prof.id}>
-                          <div className="admin-row-main">
-                            <div className="admin-row-title">
-                              <strong>
-                                {prof.full_name} (@{prof.username})
-                              </strong>
-                              {isVerified && (
-                                <BadgeCheck
-                                  size={15}
-                                  className="text-primary shrink-0"
-                                  aria-label="Verified"
-                                />
-                              )}
-                            </div>
-                            <small className="tabular-nums">
-                              {prof.email} · {prof.account_type} ·{" "}
-                              <span
-                                className={
-                                  prof.role === "admin" ? "text-primary font-bold" : undefined
-                                }
-                              >
-                                {prof.role}
-                              </span>
-                              {" · "}
-                              <span
-                                className={
-                                  prof.is_suspended
-                                    ? "status-text-danger"
-                                    : isVerified
-                                      ? "status-text-success"
-                                      : undefined
-                                }
-                              >
-                                {prof.is_suspended
-                                  ? "Suspended"
-                                  : isVerified
-                                    ? "Verified"
-                                    : prof.verification_status}
-                              </span>
-                              {` · Joined ${formatShortDate(prof.created_at)}`}
-                            </small>
-                          </div>
-                          <div className="admin-card-action">
-                            <Button
-                              variant={isVerified ? "secondary" : "outline"}
-                              size="sm"
-                              className="whitespace-nowrap shrink-0"
-                              onClick={() =>
-                                void handleUserVerification(
-                                  prof,
-                                  isVerified ? "unverified" : "verified",
-                                )
-                              }
-                            >
-                              <BadgeCheck size={14} />
-                              {isVerified ? "Verified" : "Verify"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="whitespace-nowrap shrink-0"
-                              onClick={() => {
-                                setBroadcastScope("single");
-                                setBroadcastUserId(prof.id);
-                                setSection("broadcasts");
-                              }}
-                            >
-                              <Send size={14} />
-                              Notify
-                            </Button>
-                            {!isSelf && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="whitespace-nowrap shrink-0"
-                                  onClick={() =>
-                                    setRoleTarget({
-                                      id: prof.id,
-                                      name: prof.full_name,
-                                      nextRole: prof.role === "admin" ? "user" : "admin",
-                                    })
-                                  }
-                                >
-                                  <UserCog size={14} />
-                                  {prof.role === "admin" ? "Demote" : "Make Admin"}
-                                </Button>
-                                <Button
-                                  variant={prof.is_suspended ? "outline" : "destructive"}
-                                  size="sm"
-                                  className="whitespace-nowrap shrink-0"
-                                  onClick={() =>
-                                    void adminService
-                                      .toggleUserSuspension(
-                                        prof.id,
-                                        !prof.is_suspended,
-                                        prof.is_suspended
-                                          ? "Account restored"
-                                          : "Suspended by administrator",
-                                      )
-                                      .then(() => {
-                                        toast.success(
-                                          prof.is_suspended
-                                            ? `${prof.full_name} restored`
-                                            : `${prof.full_name} suspended`,
-                                        );
-                                        return loadAdminWorkspace();
-                                      })
-                                      .catch((err) =>
-                                        toast.error(
-                                          err instanceof Error ? err.message : "Action failed",
-                                        ),
-                                      )
-                                  }
-                                >
-                                  {prof.is_suspended ? <RotateCcw size={14} /> : <Ban size={14} />}
-                                  {prof.is_suspended ? "Restore" : "Suspend"}
-                                </Button>
-                              </>
+              {filteredProfiles.length ? (
+                <div className="admin-list">
+                  {filteredProfiles.map((prof) => {
+                    const isSelf = prof.id === user.id;
+                    const isVerified = prof.verification_status === "verified";
+                    return (
+                      <article className="admin-card-row" key={prof.id}>
+                        <div className="admin-row-main">
+                          <div className="admin-row-title">
+                            <strong>
+                              {prof.full_name} (@{prof.username})
+                            </strong>
+                            {isVerified && (
+                              <BadgeCheck
+                                size={15}
+                                className="text-primary shrink-0"
+                                aria-label="Verified"
+                              />
                             )}
                           </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Empty title="No matching users" text="Try another search term or filter." />
-                )
-              ) : (
-                <div className="admin-list">
-                  {offlineUsers.map((u) => {
-                    const isVerified = localVerifiedIds.includes(u.id);
-                    const isSuspended = localSuspendedIds.includes(u.id);
-                    return (
-                      <article className="admin-card-row" key={u.id}>
-                        <div className="admin-row-main">
-                          <strong>{u.name}</strong>
-                          <small>
-                            {u.university} · {u.role} ·{" "}
-                            {isSuspended ? "Suspended" : isVerified ? "Verified" : "Active"}
+                          <small className="tabular-nums">
+                            {prof.email} · {prof.account_type} ·{" "}
+                            <span
+                              className={
+                                prof.role === "admin" ? "text-primary font-bold" : undefined
+                              }
+                            >
+                              {prof.role}
+                            </span>
+                            {" · "}
+                            <span
+                              className={
+                                prof.is_suspended
+                                  ? "status-text-danger"
+                                  : isVerified
+                                    ? "status-text-success"
+                                    : undefined
+                              }
+                            >
+                              {prof.is_suspended
+                                ? "Suspended"
+                                : isVerified
+                                  ? "Verified"
+                                  : prof.verification_status}
+                            </span>
+                            {` · Joined ${formatShortDate(prof.created_at)}`}
                           </small>
                         </div>
                         <div className="admin-card-action">
                           <Button
                             variant={isVerified ? "secondary" : "outline"}
                             size="sm"
-                            onClick={() => {
-                              setLocalVerifiedIds((prev) =>
-                                prev.includes(u.id)
-                                  ? prev.filter((x) => x !== u.id)
-                                  : [...prev, u.id],
-                              );
-                              pushLocalLog("user_verification_toggled", "profile", u.id, u.name);
-                            }}
+                            className="whitespace-nowrap shrink-0"
+                            onClick={() =>
+                              void handleUserVerification(
+                                prof,
+                                isVerified ? "unverified" : "verified",
+                              )
+                            }
                           >
                             <BadgeCheck size={14} />
                             {isVerified ? "Verified" : "Verify"}
                           </Button>
                           <Button
-                            variant={isSuspended ? "outline" : "destructive"}
+                            variant="outline"
                             size="sm"
+                            className="whitespace-nowrap shrink-0"
                             onClick={() => {
-                              setLocalSuspendedIds((prev) =>
-                                prev.includes(u.id)
-                                  ? prev.filter((x) => x !== u.id)
-                                  : [...prev, u.id],
-                              );
-                              pushLocalLog("user_suspension_toggled", "profile", u.id, u.name);
+                              setBroadcastScope("single");
+                              setBroadcastUserId(prof.id);
+                              setSection("broadcasts");
                             }}
                           >
-                            {isSuspended ? <RotateCcw size={14} /> : <Ban size={14} />}
-                            {isSuspended ? "Restore" : "Suspend"}
+                            <Send size={14} />
+                            Notify
                           </Button>
+                          {!isSelf && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="whitespace-nowrap shrink-0"
+                                onClick={() =>
+                                  setRoleTarget({
+                                    id: prof.id,
+                                    name: prof.full_name,
+                                    nextRole: prof.role === "admin" ? "user" : "admin",
+                                  })
+                                }
+                              >
+                                <UserCog size={14} />
+                                {prof.role === "admin" ? "Demote" : "Make Admin"}
+                              </Button>
+                              <Button
+                                variant={prof.is_suspended ? "outline" : "destructive"}
+                                size="sm"
+                                className="whitespace-nowrap shrink-0"
+                                onClick={() =>
+                                  void adminService
+                                    .toggleUserSuspension(
+                                      prof.id,
+                                      !prof.is_suspended,
+                                      prof.is_suspended
+                                        ? "Account restored"
+                                        : "Suspended by administrator",
+                                    )
+                                    .then(() => {
+                                      toast.success(
+                                        prof.is_suspended
+                                          ? `${prof.full_name} restored`
+                                          : `${prof.full_name} suspended`,
+                                      );
+                                      return loadAdminWorkspace();
+                                    })
+                                    .catch((err) =>
+                                      toast.error(
+                                        err instanceof Error ? err.message : "Action failed",
+                                      ),
+                                    )
+                                }
+                              >
+                                {prof.is_suspended ? <RotateCcw size={14} /> : <Ban size={14} />}
+                                {prof.is_suspended ? "Restore" : "Suspend"}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </article>
                     );
                   })}
                 </div>
+              ) : (
+                <Empty title="No matching users" text="Try another search term or filter." />
               )}
             </div>
           ) : section === "universities" ? (
@@ -1798,7 +1431,7 @@ export function AdminPage() {
                       onChange={(e) => setNewUniDesc(e.target.value)}
                     />
                   </label>
-                  <div className="flex items-end gap-2">
+                  <div className="flex flex-wrap items-end gap-2">
                     <label className="form-field w-24 !mb-0">
                       <span>Order</span>
                       <input
@@ -1833,7 +1466,7 @@ export function AdminPage() {
               </form>
 
               <div className="admin-list">
-                {(backendConfigured ? adminUniversities : localUnis).map((u) => (
+                {adminUniversities.map((u) => (
                   <article className="admin-card-row" key={u.id}>
                     <div className="admin-row-main">
                       <strong>
@@ -1850,33 +1483,25 @@ export function AdminPage() {
                       </small>
                     </div>
                     <div className="admin-card-action">
-                      {backendConfigured && "slug" in u && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditUniversity(u as UniversityRecord)}
-                        >
-                          <Pencil size={14} />
-                          Edit
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" onClick={() => startEditUniversity(u)}>
+                        <Pencil size={14} />
+                        Edit
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          if (!backendConfigured) {
-                            setLocalUnis((prev) =>
-                              prev.map((row) =>
-                                row.id === u.id ? { ...row, is_active: !row.is_active } : row,
-                              ),
-                            );
-                            pushLocalLog("university_toggled", "university", u.id, u.short_name);
-                            return;
-                          }
                           void adminService
                             .toggleUniversityActive(u.id, !u.is_active)
                             .then(() => Promise.all([loadAdminWorkspace(), refreshMetadata()]))
-                            .then(() => toast.success("University status updated"));
+                            .then(() => toast.success("University status updated"))
+                            .catch((err) =>
+                              toast.error(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Could not update university status",
+                              ),
+                            );
                         }}
                       >
                         {u.is_active ? "Disable" : "Enable"}
@@ -1961,7 +1586,7 @@ export function AdminPage() {
               </form>
 
               <div className="admin-list">
-                {(backendConfigured ? adminCategories : localCats)
+                {adminCategories
                   .filter((c) => categoryFilter === "all" || c.category_type === categoryFilter)
                   .map((c) => (
                     <article className="admin-card-row" key={c.id}>
@@ -1977,33 +1602,23 @@ export function AdminPage() {
                         </small>
                       </div>
                       <div className="admin-card-action">
-                        {backendConfigured && "slug" in c && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => startEditCategory(c as CategoryRecord)}
-                          >
-                            <Pencil size={14} />
-                            Edit
-                          </Button>
-                        )}
+                        <Button variant="ghost" size="sm" onClick={() => startEditCategory(c)}>
+                          <Pencil size={14} />
+                          Edit
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (!backendConfigured) {
-                              setLocalCats((prev) =>
-                                prev.map((row) =>
-                                  row.id === c.id ? { ...row, is_active: !row.is_active } : row,
-                                ),
-                              );
-                              pushLocalLog("category_toggled", "category", c.id, c.name);
-                              return;
-                            }
                             void adminService
                               .toggleCategoryActive(c.id, !c.is_active)
                               .then(() => Promise.all([loadAdminWorkspace(), refreshMetadata()]))
-                              .then(() => toast.success("Category updated"));
+                              .then(() => toast.success("Category updated"))
+                              .catch((err) =>
+                                toast.error(
+                                  err instanceof Error ? err.message : "Could not update category",
+                                ),
+                              );
                           }}
                         >
                           {c.is_active ? "Hide" : "Show"}
@@ -2016,11 +1631,9 @@ export function AdminPage() {
           ) : section === "broadcasts" ? (
             <div className="admin-section-stack">
               <SectionTitle eyebrow="Communications" title="Announcements & User Notifications">
-                {backendConfigured && (
-                  <span className="tabular-nums text-xs text-muted-foreground">
-                    {broadcastTargets.length} recipient{broadcastTargets.length === 1 ? "" : "s"}
-                  </span>
-                )}
+                <span className="tabular-nums text-xs text-muted-foreground">
+                  {broadcastTargets.length} recipient{broadcastTargets.length === 1 ? "" : "s"}
+                </span>
               </SectionTitle>
 
               <form className="admin-form-panel" onSubmit={(e) => void handleSendBroadcast(e)}>
@@ -2054,7 +1667,7 @@ export function AdminPage() {
                   </div>
                 </div>
 
-                {broadcastScope === "university" && backendConfigured && (
+                {broadcastScope === "university" && (
                   <div className="form-field">
                     <span>Select university</span>
                     <AnimatedSelect
@@ -2070,7 +1683,7 @@ export function AdminPage() {
                   </div>
                 )}
 
-                {broadcastScope === "single" && backendConfigured && (
+                {broadcastScope === "single" && (
                   <div className="form-field">
                     <span>Select user</span>
                     <AnimatedSelect
@@ -2127,64 +1740,62 @@ export function AdminPage() {
                 gateways or in-app checkout.
               </p>
 
-              {backendConfigured && (
-                <form className="admin-form-panel" onSubmit={(e) => void handleSavePromotion(e)}>
-                  <div className="form-grid">
-                    <label className="form-field">
-                      <span>Plan name</span>
-                      <input
-                        required
-                        placeholder="Hall Week Spotlight (5 days)"
-                        value={newPromoName}
-                        onChange={(e) => setNewPromoName(e.target.value)}
-                      />
-                    </label>
-                    <div className="flex gap-2 items-end">
-                      <div className="form-field flex-1 !mb-0">
-                        <span>Scope</span>
-                        <AnimatedSelect
-                          ariaLabel="Promotion scope"
-                          value={newPromoScope}
-                          onValueChange={setNewPromoScope}
-                          options={["listing", "service", "banner"]}
-                        />
-                      </div>
-                      <label className="form-field w-24 !mb-0">
-                        <span>Days</span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={newPromoDays}
-                          onChange={(e) => setNewPromoDays(e.target.value)}
-                        />
-                      </label>
-                      <label className="form-field w-28 !mb-0">
-                        <span>Ref. GH₵</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={newPromoFee}
-                          onChange={(e) => setNewPromoFee(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                  </div>
+              <form className="admin-form-panel" onSubmit={(e) => void handleSavePromotion(e)}>
+                <div className="form-grid">
+                  <label className="form-field">
+                    <span>Plan name</span>
+                    <input
+                      required
+                      placeholder="Hall Week Spotlight (5 days)"
+                      value={newPromoName}
+                      onChange={(e) => setNewPromoName(e.target.value)}
+                    />
+                  </label>
                   <div className="flex flex-wrap gap-2 items-end">
-                    <label className="form-field flex-1 !mb-0">
-                      <span>Description</span>
+                    <div className="form-field flex-1 min-w-[120px] !mb-0">
+                      <span>Scope</span>
+                      <AnimatedSelect
+                        ariaLabel="Promotion scope"
+                        value={newPromoScope}
+                        onValueChange={setNewPromoScope}
+                        options={["listing", "service", "banner"]}
+                      />
+                    </div>
+                    <label className="form-field w-24 !mb-0">
+                      <span>Days</span>
                       <input
-                        placeholder="Where and how this featured slot appears..."
-                        value={newPromoDesc}
-                        onChange={(e) => setNewPromoDesc(e.target.value)}
+                        type="number"
+                        min={1}
+                        value={newPromoDays}
+                        onChange={(e) => setNewPromoDays(e.target.value)}
                       />
                     </label>
-                    <Button type="submit" className="whitespace-nowrap shrink-0">
-                      <Plus size={15} />
-                      Add slot
-                    </Button>
+                    <label className="form-field w-28 !mb-0">
+                      <span>Ref. GH₵</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={newPromoFee}
+                        onChange={(e) => setNewPromoFee(e.target.value)}
+                      />
+                    </label>
                   </div>
-                </form>
-              )}
+                </div>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <label className="form-field flex-1 min-w-[180px] !mb-0">
+                    <span>Description</span>
+                    <input
+                      placeholder="Where and how this featured slot appears..."
+                      value={newPromoDesc}
+                      onChange={(e) => setNewPromoDesc(e.target.value)}
+                    />
+                  </label>
+                  <Button type="submit" className="whitespace-nowrap shrink-0">
+                    <Plus size={15} />
+                    Add slot
+                  </Button>
+                </div>
+              </form>
 
               {promotionConfigs.length ? (
                 <div className="admin-list">
@@ -2213,6 +1824,13 @@ export function AdminPage() {
                               .togglePromotionConfig(promo.id, !promo.is_active)
                               .then(() => loadAdminWorkspace())
                               .then(() => toast.success("Promotion slot updated"))
+                              .catch((err) =>
+                                toast.error(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Could not update promotion slot",
+                                ),
+                              )
                           }
                         >
                           {promo.is_active ? "Disable" : "Enable"}
@@ -2224,7 +1842,7 @@ export function AdminPage() {
               ) : (
                 <Empty
                   title="No promotion configs"
-                  text="Connect Supabase or add a featured slot configuration above."
+                  text="Add a featured slot configuration above."
                 />
               )}
             </div>
@@ -2232,12 +1850,12 @@ export function AdminPage() {
             <div className="admin-section-stack">
               <SectionTitle eyebrow="Accountability" title="Moderation & Admin Audit Log">
                 <span className="tabular-nums text-xs text-muted-foreground">
-                  {effectiveLogs.length} entries
+                  {auditLogs.length} entries
                 </span>
               </SectionTitle>
-              {effectiveLogs.length ? (
+              {auditLogs.length ? (
                 <div className="admin-log-list">
-                  {effectiveLogs.map((log) => {
+                  {auditLogs.map((log) => {
                     const actor = profileMap.get(log.admin_id);
                     return (
                       <div className="admin-log-row" key={log.id}>
