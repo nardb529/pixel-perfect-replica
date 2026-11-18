@@ -255,13 +255,19 @@ export function Logo({ light = false }: { light?: boolean }) {
       to="/discover"
       onClick={handleLogoClick}
       className={`brand ${light ? "brand-light" : ""}`}
+      aria-label="CampusLoop — Ghana University Campus Marketplace"
     >
       <span className="brand-symbol">
         <BrandMark size={34} />
       </span>
-      <span>
-        {BRAND}
-        <span className="brand-dot">.</span>
+      <span className="flex flex-col leading-none">
+        <span>
+          {BRAND}
+          <span className="brand-dot">.</span>
+        </span>
+        <small className="mt-0.5 text-[10px] font-semibold tracking-tight text-muted-foreground">
+          Campus Marketplace
+        </small>
       </span>
     </Link>
   );

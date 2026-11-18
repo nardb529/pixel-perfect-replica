@@ -1804,6 +1804,7 @@ values
   ('Accra Technical University', 'ATU', 'atu', 'Tudu, Accra', 'Greater Accra', 'Applied science, engineering and business campus in central Accra.', 13, true),
   ('Kumasi Technical University', 'KsTU', 'kstu', 'Kumasi', 'Ashanti', 'Technical and vocational innovation hub in Kumasi.', 14, true),
   ('Takoradi Technical University', 'TTU', 'ttu', 'Takoradi', 'Western', 'Applied engineering, art and design university in Sekondi-Takoradi.', 15, true),
+  ('Central University', 'Central University', 'central-university', 'Miotso, Accra / Mataheko', 'Greater Accra', 'Private university community serving students at Miotso and Accra campuses.', 16, true),
   ('Other Accredited Institutions', 'Other institutions', 'other-institutions', 'Nationwide', 'Ghana', 'Accredited colleges, polytechnics and private university campuses across Ghana.', 99, true)
 on conflict (slug) do update set
   university_name = excluded.university_name,

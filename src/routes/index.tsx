@@ -5,14 +5,10 @@ import { Button } from "@/components/ui/button";
 import { BrandMark, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
 import { BRAND } from "@/lib/campus/data";
-import { pageHead } from "@/lib/campus/meta";
+import { pageHead, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/campus/meta";
 
 export const Route = createFileRoute("/")({
-  head: () =>
-    pageHead(
-      "Your campus. Your loop.",
-      "Discover products, services and student talent across Ghanaian university communities.",
-    ),
+  head: () => pageHead(SITE_TITLE, SITE_DESCRIPTION, { path: "/" }),
   component: Welcome,
 });
 
@@ -94,7 +90,11 @@ function Welcome() {
             {BRAND}
             <span>.</span>
           </h1>
-          <p className="launch-tagline">Your campus. Your loop.</p>
+          <p className="launch-tagline">Ghana’s University Campus Marketplace</p>
+          <p className="mt-2 max-w-xs text-center text-xs leading-relaxed text-muted-foreground">
+            Buy, sell &amp; book student products and campus services across KNUST, UG, UCC, Central
+            University &amp; more.
+          </p>
         </div>
       </div>
 

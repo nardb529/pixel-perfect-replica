@@ -10,8 +10,9 @@ const DiscoverPage = lazy(() =>
 export const Route = createFileRoute("/discover")({
   head: () =>
     pageHead(
-      "Discover your campus",
-      "Explore fresh products, talented service providers and affordable finds across Ghanaian campuses.",
+      "Discover Campus Marketplace",
+      "Explore verified student products, campus services, electronics, books, and hostel essentials across Ghanaian university campuses.",
+      { path: "/discover" },
     ),
   component: DiscoverRouteComponent,
 });

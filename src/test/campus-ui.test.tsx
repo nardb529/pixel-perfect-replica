@@ -244,9 +244,40 @@ describe("Global ErrorBoundary & free-tier analytics cache", () => {
     consoleSpy.mockRestore();
   });
 
-  it("masks raw technical errors behind a generic message while preserving UserInputError guidance", () => {
+  it("shows actionable auth & user errors cleanly while masking internal DB/network errors", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
+    // User-actionable authentication & account errors MUST be shown clearly
+    expect(toUserSafeErrorMessage(new Error("Invalid login credentials"))).toBe(
+      "Incorrect email or password. Please check your details and try again.",
+    );
+    expect(toUserSafeErrorMessage({ message: "Email not confirmed" })).toBe(
+      "Please verify your email address from the confirmation link in your inbox before signing in.",
+    );
+    expect(toUserSafeErrorMessage({ message: "User already registered" })).toBe(
+      "An account with this email already exists. Switch to Log In instead.",
+    );
+    expect(
+      toUserSafeErrorMessage({
+        message: "New password should be different from the old password.",
+      }),
+    ).toBe("Choose a new password that is different from your current password.");
+    expect(
+      toUserSafeErrorMessage({
+        message: "For security purposes, you can only request this after 42 seconds.",
+      }),
+    ).toBe("Too many attempts. Please wait 42 seconds before trying again.");
+    expect(
+      toUserSafeErrorMessage({
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "profiles_username_key"',
+      }),
+    ).toBe("That username is already taken. Try choosing a different username.");
+    expect(
+      toUserSafeErrorMessage(new UserInputError("Upload a clear photo of your Student ID.")),
+    ).toBe("Upload a clear photo of your Student ID.");
+
+    // Internal database, network, schema, JWT, and unknown failures MUST stay masked
     expect(
       toUserSafeErrorMessage(new Error('relation "public.profiles" does not exist (PGRST205)')),
     ).toBe(TECHNICAL_ISSUE_MESSAGE);
@@ -254,9 +285,6 @@ describe("Global ErrorBoundary & free-tier analytics cache", () => {
     expect(toUserSafeErrorMessage({ message: "JWT expired", code: "PGRST301" })).toBe(
       TECHNICAL_ISSUE_MESSAGE,
     );
-    expect(
-      toUserSafeErrorMessage(new UserInputError("Upload a clear photo of your Student ID.")),
-    ).toBe("Upload a clear photo of your Student ID.");
 
     consoleSpy.mockRestore();
   });

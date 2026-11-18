@@ -14,6 +14,7 @@ export const Route = createFileRoute("/reset-password")({
     pageHead(
       "Reset password",
       "Set a new password for your CampusLoop seller or service provider account.",
+      { path: "/reset-password", noIndex: true },
     ),
   component: ResetPasswordPage,
 });

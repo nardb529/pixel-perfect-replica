@@ -9,7 +9,11 @@ const ManualPage = lazy(() =>
 
 export const Route = createFileRoute("/manual")({
   head: () =>
-    pageHead("User Manual", "Step-by-step guide to buying, selling and installing CampusLoop."),
+    pageHead(
+      "Marketplace Guide & FAQs",
+      "Learn how to buy without an account, verify your seller ID, stay safe at campus meetups, and install CampusLoop in Ghana.",
+      { path: "/manual" },
+    ),
   component: ManualRouteComponent,
 });
 
