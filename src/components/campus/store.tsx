@@ -11,6 +11,7 @@ import {
 import {
   productCategories as defaultProductCategories,
   serviceCategories as defaultServiceCategories,
+  toUserSafeErrorMessage,
   universities as defaultUniversities,
   type Listing,
 } from "@/lib/campus/data";
@@ -20,8 +21,10 @@ import {
   resetVisitorSessionId,
 } from "@/lib/supabase/client";
 import { clearAnalyticsSessionCache } from "@/services/analyticsService";
+import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
 import type {
   CategoryRecord,
+  IdDocumentType,
   NotificationPreferences,
   NotificationRecord,
   ProfileRecord,
@@ -58,6 +61,13 @@ export type CampusUser = {
   avatar?: string | undefined;
   role?: UserRole | undefined;
   verificationStatus?: VerificationStatus | undefined;
+  isStudent?: boolean | undefined;
+  idDocumentType?: IdDocumentType | null | undefined;
+  idDocumentPath?: string | null | undefined;
+  verificationPhotoConfirmed?: boolean | undefined;
+  verificationSubmittedAt?: string | null | undefined;
+  verificationNote?: string | null | undefined;
+  verificationChecks?: VerificationChecksPayload | null | undefined;
   isSuspended?: boolean | undefined;
   notificationPreferences?: NotificationPreferences | undefined;
 };
@@ -92,6 +102,13 @@ function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): 
     avatar: profile.profile_image || undefined,
     role: profile.role,
     verificationStatus: profile.verification_status,
+    isStudent: profile.is_student,
+    idDocumentType: profile.id_document_type,
+    idDocumentPath: profile.id_document_path,
+    verificationPhotoConfirmed: profile.verification_photo_confirmed,
+    verificationSubmittedAt: profile.verification_submitted_at,
+    verificationNote: profile.verification_note,
+    verificationChecks: profile.verification_checks ?? null,
     isSuspended: profile.is_suspended,
     notificationPreferences: profile.notification_preferences,
   };
@@ -253,9 +270,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (isSchemaMissingError(err)) {
         setSchemaReady(false);
-      } else {
-        setListingsError(err instanceof Error ? err.message : "Could not load campus listings.");
       }
+      setListingsError(toUserSafeErrorMessage(err));
       setListings([]);
     } finally {
       setListingsLoading(false);
@@ -350,6 +366,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
           email: session.user.email || "",
           university: String(session.user.user_metadata?.["university_name"] || "Ghana Campus"),
           capability: String(session.user.user_metadata?.["account_type"] || "Both"),
+          isStudent: session.user.user_metadata?.["is_student"] !== false,
+          verificationStatus: "unverified",
           bio: "",
           contact: "WhatsApp",
         };

@@ -6,12 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AnimatedSelect, Logo, ThemeToggle } from "./shared";
 import { useCampus } from "./store";
-import { BRAND, validatePassword } from "@/lib/campus/data";
+import {
+  BRAND,
+  TECHNICAL_ISSUE_MESSAGE,
+  toUserSafeErrorMessage,
+  validatePassword,
+} from "@/lib/campus/data";
 import { authenticationService } from "@/services";
 import type { AccountType } from "@/lib/supabase/database.types";
 
 export function AuthPage() {
   const [mode, setMode] = useState<"signup" | "login">("signup");
+  const [isStudent, setIsStudent] = useState(true);
   const [show, setShow] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -57,9 +63,7 @@ export function AuthPage() {
     const whatsapp = String(data.get("whatsapp") || "").trim();
 
     if (!backendConfigured) {
-      setError(
-        "Authentication service is currently unavailable. Please configure your Supabase credentials to sign in or register.",
-      );
+      setError(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
 
@@ -79,6 +83,7 @@ export function AuthPage() {
           universityName: chosenUniName,
           phoneNumber: whatsapp || undefined,
           whatsappNumber: whatsapp || undefined,
+          isStudent,
         });
 
         if (res.needsEmailConfirmation) {
@@ -94,9 +99,7 @@ export function AuthPage() {
       triggerSellerPostAuth();
       navigate({ to: signedInUser?.role === "admin" ? "/admin" : "/dashboard" });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unable to complete authentication. Try again.";
-      setError(message);
+      setError(toUserSafeErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -108,7 +111,7 @@ export function AuthPage() {
       await authenticationService.resendVerificationEmail(verificationPendingEmail);
       toast.success("Verification email resent");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not resend email");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -116,14 +119,14 @@ export function AuthPage() {
     e.preventDefault();
     if (!forgotEmail.trim()) return;
     if (!backendConfigured) {
-      toast.error("Password reset is unavailable until Supabase Auth is configured.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     try {
       await authenticationService.sendPasswordResetEmail(forgotEmail);
       setSent(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send reset link");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -135,20 +138,23 @@ export function AuthPage() {
           <ThemeToggle compact />
         </div>
         <div className="auth-aside-copy surface-panel curve-accent">
-          <h2>Reach students on your campus.</h2>
-          <p>List products or offer services to students across your university community.</p>
+          <h2>Sell safely across Ghanaian campuses.</h2>
+          <p>
+            Buyers never need an account to browse or contact sellers. Seller accounts require ID
+            and photo verification before listing.
+          </p>
           <ul className="auth-aside-points">
             <li>
               <CheckCircle2 size={16} />
-              <span>Verified campus marketplace profiles</span>
+              <span>Students verify with a Student ID &amp; real profile photo</span>
             </li>
             <li>
               <CheckCircle2 size={16} />
-              <span>Direct WhatsApp &amp; phone enquiries</span>
+              <span>Non-students verify with a Ghana Card or Voter&apos;s ID</span>
             </li>
             <li>
               <ShieldCheck size={16} />
-              <span>Zero middleman fees or payment delays</span>
+              <span>Zero account required for buyers — direct campus chat</span>
             </li>
           </ul>
         </div>
@@ -334,6 +340,34 @@ export function AuthPage() {
                         />
                       </div>
                     </div>
+                    <div className="form-field">
+                      <span>Seller verification status</span>
+                      <div
+                        className="segmented compact-tabs"
+                        role="group"
+                        aria-label="Student or non-student seller"
+                      >
+                        <button
+                          type="button"
+                          className={isStudent ? "selected" : ""}
+                          onClick={() => setIsStudent(true)}
+                        >
+                          I am a Student
+                        </button>
+                        <button
+                          type="button"
+                          className={!isStudent ? "selected" : ""}
+                          onClick={() => setIsStudent(false)}
+                        >
+                          Not a Student
+                        </button>
+                      </div>
+                      <small className="text-xs text-muted-foreground mt-1 block">
+                        {isStudent
+                          ? "After sign-up you will upload your Student ID and a matching real profile photo."
+                          : "After sign-up you will upload your Ghana Card or Voter's ID and a matching real profile photo."}
+                      </small>
+                    </div>
                   </>
                 ) : (
                   <div className="forgot-row">
@@ -367,14 +401,12 @@ export function AuthPage() {
               </form>
 
               <p className="auth-footnote">
-                {backendConfigured
-                  ? "Protected by CampusLoop Auth — by continuing you agree to our "
-                  : "Supabase connection required for sign in and registration — "}
+                Protected by CampusLoop Auth — by continuing you agree to our{" "}
                 <Link to="/terms">Terms</Link> &amp; <Link to="/privacy">Privacy Policy</Link>.
               </p>
 
               <div className="auth-browse">
-                Just browsing? <Link to="/discover">Explore the marketplace</Link>
+                Buying only? No account needed — <Link to="/discover">Browse the marketplace</Link>
               </div>
             </>
           )}

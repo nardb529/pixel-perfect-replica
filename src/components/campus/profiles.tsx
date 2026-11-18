@@ -14,8 +14,14 @@ import {
   Moon,
   Sun,
   ChevronRight,
-  ExternalLink,
   Shield,
+  ArrowLeft,
+  Phone,
+  Share2,
+  ShoppingBag,
+  Briefcase,
+  Search,
+  Store as StoreIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,9 +36,18 @@ import {
   AnimatedSelect,
   PagePendingFallback,
 } from "./shared";
-import { buildWhatsAppUrl, isSafeMediaUrl, ownsListing, type Listing } from "@/lib/campus/data";
+import {
+  TECHNICAL_ISSUE_MESSAGE,
+  buildPhoneHref,
+  buildWhatsAppUrl,
+  isSafeMediaUrl,
+  ownsListing,
+  toUserSafeErrorMessage,
+  type Listing,
+} from "@/lib/campus/data";
 import { listingService, profileService } from "@/services";
 import type { PublicSellerProfileRecord } from "@/lib/supabase/database.types";
+import { SellerStatusIndicator } from "./verification";
 
 export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const {
@@ -59,6 +74,8 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [collectionTab, setCollectionTab] = useState<"saved" | "liked">("saved");
+  const [shopTab, setShopTab] = useState<"all" | "product" | "service">("all");
+  const [shopQuery, setShopQuery] = useState("");
   const [remoteProfile, setRemoteProfile] = useState<PublicSellerProfileRecord | null>(null);
   const [remoteListings, setRemoteListings] = useState<Listing[]>([]);
   const [affiliations, setAffiliations] = useState<string[]>([]);
@@ -188,23 +205,55 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const active = sellerId
     ? remoteListings.length > 0
       ? remoteListings.map((item) => ({ ...item, seller: profile?.name || item.seller }))
-      : listings.filter((l) => l.status === "Active" && l.seller === profile?.name)
+      : listings.filter(
+          (l) => l.status === "Active" && (l.sellerId === sellerId || l.seller === profile?.name),
+        )
     : backendConfigured
       ? myListings.filter((l) => l.status === "Active")
       : listings.filter((l) => l.status === "Active" && ownsListing(l, user?.email));
+
+  const trimmedShopQuery = shopQuery.trim().toLowerCase();
+  const shopFiltered = active.filter((item) => {
+    if (!trimmedShopQuery) return true;
+    return (
+      item.title.toLowerCase().includes(trimmedShopQuery) ||
+      item.category.toLowerCase().includes(trimmedShopQuery) ||
+      item.description.toLowerCase().includes(trimmedShopQuery)
+    );
+  });
+  const shopProducts = shopFiltered.filter((l) => l.type === "product");
+  const shopServices = shopFiltered.filter((l) => l.type === "service");
 
   const favourites = listings.filter((l) => saved.includes(l.id));
   const likedList = listings.filter((l) => liked.includes(l.id));
   const visibleCollection = collectionTab === "saved" ? favourites : likedList;
   const whatsappHref = buildWhatsAppUrl(
     profile?.contactDetails,
-    `Hi ${profile?.name || ""}, I found your store on CampusLoop.`,
+    `Hi ${profile?.name || ""}, I visited your shop on CampusLoop.`,
   );
+  const phoneHref = buildPhoneHref(profile?.contactDetails);
+
+  async function shareShop() {
+    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${profile?.name || "Seller"} — CampusLoop Shop`,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Shop link copied");
+      }
+    } catch {
+      toast.info("Share cancelled");
+    }
+  }
 
   async function handleAvatarSelect(file?: File) {
     if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") return;
     if (!backendConfigured) {
-      toast.error("Backend storage is required to upload a profile photo.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     setUploadingAvatar(true);
@@ -213,7 +262,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       setAvatar(publicUrl);
       toast.success("Profile photo uploaded");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not upload profile photo");
+      toast.error(toUserSafeErrorMessage(err));
     } finally {
       setUploadingAvatar(false);
     }
@@ -223,7 +272,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     e.preventDefault();
     if (!user) return;
     if (!backendConfigured) {
-      toast.error("Profile updates require an active Supabase connection.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     const data = new FormData(e.currentTarget);
@@ -276,7 +325,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       toast.success("Profile updated");
       setEditing(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save profile");
+      toast.error(toUserSafeErrorMessage(err));
     } finally {
       setSavingProfile(false);
     }
@@ -284,6 +333,13 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
   return (
     <Shell>
+      {sellerId && (
+        <Link to="/discover" className="back-link">
+          <ArrowLeft size={15} />
+          Back to marketplace
+        </Link>
+      )}
+
       <section className="surface-panel hero-panel profile-hero-panel curve-accent">
         <HeroAmbient />
         <div className="profile-top">
@@ -310,10 +366,10 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
           <div className="profile-heading">
             <p className="greeting">
               <span className="greeting-pulse" aria-hidden="true" />
-              {sellerId ? "Campus storefront" : user ? "Seller studio" : "Buyer pass"}
+              {sellerId ? "Seller shop storefront" : user ? "Seller studio" : "Buyer pass"}
             </p>
             <h1 className="seller-name-inline">
-              {profile?.name || "Guest buyer"}
+              {sellerId ? `${profile?.name || "Seller"}’s Shop` : profile?.name || "Guest buyer"}
               {profile?.verificationStatus === "verified" && (
                 <BadgeCheck
                   size={18}
@@ -323,11 +379,15 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
               )}
             </h1>
             <p>
+              {profile?.username ? `@${profile.username} · ` : ""}
               {affiliations.length > 1
                 ? affiliations.join(" · ")
                 : profile?.university || `Browsing ${university}`}
             </p>
-            <small>{profile?.capability || "No account required to browse"}</small>
+            <small>
+              {profile?.capability || "Browse & contact sellers without an account"}
+              {profile?.verificationStatus === "verified" ? " · Verified seller" : ""}
+            </small>
           </div>
           {user && !sellerId && (
             <Button
@@ -346,23 +406,59 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
         {profile?.bio && <p className="profile-bio">{profile.bio}</p>}
 
-        {profile && (
+        {sellerId && profile && <SellerStatusIndicator status={profile.verificationStatus} />}
+
+        {sellerId && profile && (
+          <div className="shop-summary-bar">
+            <div className="shop-metrics tabular-nums">
+              <span>
+                <strong>{active.length}</strong>{" "}
+                <small>{active.length === 1 ? "Listing" : "Total items"}</small>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                <strong>{active.filter((i) => i.type === "product").length}</strong>{" "}
+                <small>Products</small>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                <strong>{active.filter((i) => i.type === "service").length}</strong>{" "}
+                <small>Services</small>
+              </span>
+            </div>
+
+            <div className="shop-cta-row">
+              {whatsappHref && (
+                <Button asChild>
+                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle size={15} />
+                    Message seller
+                  </a>
+                </Button>
+              )}
+              {phoneHref && (
+                <Button variant="outline" asChild>
+                  <a href={phoneHref}>
+                    <Phone size={15} />
+                    Call
+                  </a>
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => void shareShop()}>
+                <Share2 size={15} />
+                Share shop
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {profile && !sellerId && (
           <p className="profile-contact-note">
             <MessageCircle size={15} />
             <span>
               Preferred contact: <strong>{profile.contact}</strong>
               {profile.contactDetails ? ` · ${profile.contactDetails}` : ""}
             </span>
-            {whatsappHref && sellerId && (
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-link ml-2 inline-flex items-center gap-1"
-              >
-                Chat <ExternalLink size={12} />
-              </a>
-            )}
           </p>
         )}
 
@@ -375,6 +471,14 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                     <Link to="/admin">
                       <Shield size={15} />
                       Admin Console
+                    </Link>
+                  </Button>
+                )}
+                {user.id && (
+                  <Button variant="outline" asChild>
+                    <Link to="/seller/$id" params={{ id: user.id }}>
+                      <StoreIcon size={15} />
+                      View my shop
                     </Link>
                   </Button>
                 )}
@@ -392,26 +496,124 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
               </>
             ) : (
               <Button className="dashboard-create-btn" asChild>
-                <Link to="/auth">Sell or Offer a Service</Link>
+                <Link to="/auth">Verify &amp; Sell on CampusLoop</Link>
               </Button>
             )}
           </div>
         )}
       </section>
 
-      {profile && (
-        <section className="surface-panel section-panel">
-          <SectionTitle title={sellerId ? "Active listings" : "Your public listings"} />
-          {active.length ? (
-            <div className="listing-grid">
-              {active.map((l) => (
-                <ListingCard listing={l} key={l.id} />
-              ))}
-            </div>
-          ) : (
-            <Empty title="No active listings" text="Published listings will appear here." />
-          )}
-        </section>
+      {sellerId && profile ? (
+        <>
+          <section className="surface-panel section-panel">
+            <SectionTitle eyebrow="Storefront catalog" title="Products & services in this shop">
+              <div className="segmented compact-tabs" role="tablist" aria-label="Filter shop items">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={shopTab === "all"}
+                  className={shopTab === "all" ? "selected" : ""}
+                  onClick={() => setShopTab("all")}
+                >
+                  All ({shopFiltered.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={shopTab === "product"}
+                  className={shopTab === "product" ? "selected" : ""}
+                  onClick={() => setShopTab("product")}
+                >
+                  Products ({shopProducts.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={shopTab === "service"}
+                  className={shopTab === "service" ? "selected" : ""}
+                  onClick={() => setShopTab("service")}
+                >
+                  Services ({shopServices.length})
+                </button>
+              </div>
+            </SectionTitle>
+
+            {active.length > 1 && (
+              <div className="shop-search-row">
+                <Search size={16} aria-hidden="true" />
+                <input
+                  aria-label="Search inside this seller shop"
+                  placeholder={`Search products & services from ${profile.name}...`}
+                  value={shopQuery}
+                  onChange={(e) => setShopQuery(e.target.value)}
+                />
+              </div>
+            )}
+
+            {shopFiltered.length === 0 ? (
+              <Empty
+                title="No matching items in this shop"
+                text={
+                  active.length === 0
+                    ? "This seller hasn't published active products or services yet."
+                    : "Try clearing your search or switching between Products and Services."
+                }
+              />
+            ) : shopTab === "all" && shopProducts.length > 0 && shopServices.length > 0 ? (
+              <div className="shop-catalog-sections">
+                <div className="shop-catalog-group">
+                  <div className="shop-group-head">
+                    <ShoppingBag size={16} />
+                    <h3>Products ({shopProducts.length})</h3>
+                  </div>
+                  <div className="listing-grid">
+                    {shopProducts.map((l) => (
+                      <ListingCard listing={l} key={l.id} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="shop-catalog-group">
+                  <div className="shop-group-head">
+                    <Briefcase size={16} />
+                    <h3>Services ({shopServices.length})</h3>
+                  </div>
+                  <div className="listing-grid">
+                    {shopServices.map((l) => (
+                      <ListingCard listing={l} key={l.id} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="listing-grid">
+                {(shopTab === "product"
+                  ? shopProducts
+                  : shopTab === "service"
+                    ? shopServices
+                    : shopFiltered
+                ).map((l) => (
+                  <ListingCard listing={l} key={l.id} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        profile && (
+          <section className="surface-panel section-panel">
+            <SectionTitle title="Your public listings" />
+            {active.length ? (
+              <div className="listing-grid">
+                {active.map((l) => (
+                  <ListingCard listing={l} key={l.id} />
+                ))}
+              </div>
+            ) : (
+              <Empty title="No active listings" text="Published listings will appear here." />
+            )}
+          </section>
+        )
       )}
 
       {!sellerId && (

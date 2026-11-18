@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AnimatedSelect, ListingCard } from "@/components/campus/shared";
-import { CampusProvider } from "@/components/campus/store";
-import type { Listing } from "@/lib/campus/data";
+import { CampusProvider, useCampus } from "@/components/campus/store";
+import {
+  TECHNICAL_ISSUE_MESSAGE,
+  UserInputError,
+  toUserSafeErrorMessage,
+  type Listing,
+} from "@/lib/campus/data";
 
 vi.mock("@tanstack/react-router", async () => {
   const actual =
@@ -12,18 +17,30 @@ vi.mock("@tanstack/react-router", async () => {
     Link: ({
       children,
       to,
+      params,
       className,
+      ...rest
     }: {
       children: React.ReactNode;
       to: string;
+      params?: Record<string, string>;
       className?: string;
-    }) => (
-      <a href={to} className={className}>
-        {children}
-      </a>
-    ),
+      [key: string]: unknown;
+    }) => {
+      let resolved = to;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          resolved = resolved.replace(`$${k}`, v);
+        }
+      }
+      return (
+        <a href={resolved} className={className} {...rest}>
+          {children}
+        </a>
+      );
+    },
     useNavigate: () => vi.fn(),
-    useRouter: () => ({ invalidate: vi.fn() }),
+    useRouter: () => ({ invalidate: vi.fn(), preloadRoute: vi.fn() }),
     useRouterState: () => "/discover",
   };
 });
@@ -31,6 +48,11 @@ vi.mock("@tanstack/react-router", async () => {
 import { AdminPage } from "@/components/campus/admin";
 import { AuthPage } from "@/components/campus/auth";
 import { DiscoverPage } from "@/components/campus/discovery";
+import { ProfilePage } from "@/components/campus/profiles";
+import {
+  SellerStatusIndicator,
+  validateVerificationSubmission,
+} from "@/components/campus/verification";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { analyticsService, clearAnalyticsSessionCache } from "@/services/analyticsService";
 
@@ -210,7 +232,9 @@ describe("Global ErrorBoundary & free-tier analytics cache", () => {
     );
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.getByText("Something unexpected happened")).toBeInTheDocument();
+    expect(screen.getByText("Technical issue")).toBeInTheDocument();
+    expect(screen.getByText(/it is being worked on/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Simulated render crash/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reload page/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Go to Discover/i })).toBeInTheDocument();
 
@@ -220,8 +244,163 @@ describe("Global ErrorBoundary & free-tier analytics cache", () => {
     consoleSpy.mockRestore();
   });
 
+  it("masks raw technical errors behind a generic message while preserving UserInputError guidance", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(
+      toUserSafeErrorMessage(new Error('relation "public.profiles" does not exist (PGRST205)')),
+    ).toBe(TECHNICAL_ISSUE_MESSAGE);
+    expect(toUserSafeErrorMessage(new TypeError("Failed to fetch"))).toBe(TECHNICAL_ISSUE_MESSAGE);
+    expect(toUserSafeErrorMessage({ message: "JWT expired", code: "PGRST301" })).toBe(
+      TECHNICAL_ISSUE_MESSAGE,
+    );
+    expect(
+      toUserSafeErrorMessage(new UserInputError("Upload a clear photo of your Student ID.")),
+    ).toBe("Upload a clear photo of your Student ID.");
+
+    consoleSpy.mockRestore();
+  });
+
   it("safely returns false for recordView when backend is unconfigured and clears session cache", async () => {
     clearAnalyticsSessionCache();
     expect(await analyticsService.recordView("listing-123")).toBe(false);
+  });
+});
+
+describe("Seller identity verification & unique Seller Shop", () => {
+  it("enforces Student ID for students, Ghana Card or Voter's ID for non-students, and matching profile photo", () => {
+    expect(
+      validateVerificationSubmission({
+        isStudent: true,
+        idDocumentType: "Ghana Card",
+        idDocumentPath: "uid/id.jpg",
+        profileImageUrl: "https://cdn.example.com/face.jpg",
+        photoMatchConfirmed: true,
+      }),
+    ).toMatch(/Student ID/i);
+
+    expect(
+      validateVerificationSubmission({
+        isStudent: false,
+        idDocumentType: "Student ID",
+        idDocumentPath: "uid/id.jpg",
+        profileImageUrl: "https://cdn.example.com/face.jpg",
+        photoMatchConfirmed: true,
+      }),
+    ).toMatch(/Ghana Card or Voter's ID/i);
+
+    expect(
+      validateVerificationSubmission({
+        isStudent: false,
+        idDocumentType: "Ghana Card",
+        idDocumentPath: "uid/id.jpg",
+        profileImageUrl: "",
+        photoMatchConfirmed: true,
+      }),
+    ).toMatch(/real profile photo/i);
+
+    expect(
+      validateVerificationSubmission({
+        isStudent: false,
+        idDocumentType: "Voters ID",
+        idDocumentPath: "uid/id.jpg",
+        profileImageUrl: "https://cdn.example.com/face.jpg",
+        photoMatchConfirmed: false,
+      }),
+    ).toMatch(/same person on the uploaded ID/i);
+
+    expect(
+      validateVerificationSubmission({
+        isStudent: true,
+        idDocumentType: "Student ID",
+        idDocumentPath: "uid/student-id.jpg",
+        profileImageUrl: "https://cdn.example.com/face.jpg",
+        photoMatchConfirmed: true,
+      }),
+    ).toBe("");
+
+    expect(
+      validateVerificationSubmission({
+        isStudent: false,
+        idDocumentType: "Ghana Card",
+        idDocumentPath: "uid/ghana-card.jpg",
+        profileImageUrl: "https://cdn.example.com/face.jpg",
+        photoMatchConfirmed: true,
+      }),
+    ).toBe("");
+  });
+
+  it("links listing seller names directly to the seller's shop page", () => {
+    render(
+      <CampusProvider>
+        <ListingCard listing={{ ...productFixture, sellerId: "seller-ama" }} />
+      </CampusProvider>,
+    );
+
+    const sellerLink = screen.getByRole("link", { name: /Visit Ama Boateng's shop/i });
+    expect(sellerLink).toHaveAttribute("href", "/seller/seller-ama");
+  });
+
+  it("opens the seller's unique Shop showcasing both products and services without requiring a buyer account", () => {
+    function ShopHarness() {
+      const { setListings } = useCampus();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              setListings([
+                { ...productFixture, sellerId: "seller-ama", seller: "Ama Boateng" },
+                {
+                  ...serviceFixture,
+                  id: "serv-ama",
+                  sellerId: "seller-ama",
+                  seller: "Ama Boateng",
+                  title: "Laptop Repair & SSD Upgrade",
+                },
+              ])
+            }
+          >
+            Seed shop
+          </button>
+          <ProfilePage sellerId="seller-ama" />
+        </>
+      );
+    }
+
+    render(
+      <CampusProvider>
+        <ShopHarness />
+      </CampusProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Seed shop" }));
+
+    expect(screen.getByRole("heading", { name: /Ama Boateng’s Shop/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "All (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Products (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Services (1)" })).toBeInTheDocument();
+    expect(screen.getByText("HP EliteBook 840 G6")).toBeInTheDocument();
+    expect(screen.getByText("Laptop Repair & SSD Upgrade")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Services (1)" }));
+    expect(screen.queryByText("HP EliteBook 840 G6")).not.toBeInTheDocument();
+    expect(screen.getByText("Laptop Repair & SSD Upgrade")).toBeInTheDocument();
+    expect(screen.getByText("Unverified Seller")).toBeInTheDocument();
+  });
+
+  it("renders distinct visual status indicators for Verified, Pending, and Unverified sellers", () => {
+    const { rerender } = render(<SellerStatusIndicator status="verified" />);
+    expect(screen.getByText("Verified Seller")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Identity & ID background check approved by Admin/i),
+    ).toBeInTheDocument();
+
+    rerender(<SellerStatusIndicator status="pending" />);
+    expect(screen.getByText("Verification Pending")).toBeInTheDocument();
+    expect(screen.getByText(/awaiting Admin review/i)).toBeInTheDocument();
+
+    rerender(<SellerStatusIndicator status="unverified" />);
+    expect(screen.getByText("Unverified Seller")).toBeInTheDocument();
   });
 });

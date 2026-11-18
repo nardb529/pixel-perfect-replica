@@ -28,10 +28,12 @@ import {
   PagePendingFallback,
 } from "./shared";
 import {
+  TECHNICAL_ISSUE_MESSAGE,
   buildPhoneHref,
   buildWhatsAppUrl,
   formatListingPrice,
   isSafeMediaUrl,
+  toUserSafeErrorMessage,
   type Listing,
 } from "@/lib/campus/data";
 import { listingService } from "@/services";
@@ -259,16 +261,25 @@ export function DetailPage({ id }: { id: string }) {
           </div>
 
           <div className="seller-strip">
-            <span className="avatar">
+            <Link
+              to="/seller/$id"
+              params={{ id: sellerProfileParam }}
+              className="avatar"
+              aria-label={`Open ${listing.seller}'s shop`}
+            >
               {listing.seller
                 .split(" ")
                 .map((n) => n[0])
                 .slice(0, 2)
                 .join("")}
-            </span>
+            </Link>
             <div>
-              <strong className="seller-name-inline">
-                {listing.seller}
+              <Link
+                to="/seller/$id"
+                params={{ id: sellerProfileParam }}
+                className="seller-name-inline hover:underline"
+              >
+                <strong>{listing.seller}</strong>
                 {listing.verificationStatus === "verified" && (
                   <BadgeCheck
                     size={14}
@@ -276,11 +287,18 @@ export function DetailPage({ id }: { id: string }) {
                     aria-label="Verified seller"
                   />
                 )}
-              </strong>
-              <small>{listing.university}</small>
+              </Link>
+              <small>
+                {listing.university} ·{" "}
+                {listing.verificationStatus === "verified"
+                  ? "Verified Seller"
+                  : listing.verificationStatus === "pending"
+                    ? "Verification Pending"
+                    : "Unverified Seller"}
+              </small>
             </div>
             <Link to="/seller/$id" params={{ id: sellerProfileParam }} className="text-link">
-              View profile
+              Visit shop
             </Link>
           </div>
 
@@ -435,14 +453,14 @@ export function DetailPage({ id }: { id: string }) {
                 try {
                   const ok = await reportListing(id, reason, reportDescription);
                   if (!ok) {
-                    toast.error("Report submission is unavailable while backend is disconnected.");
+                    toast.error(TECHNICAL_ISSUE_MESSAGE);
                     return;
                   }
                   toast.success("Report submitted for moderation review");
                   setReportDescription("");
                   setReport(false);
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Could not submit report.");
+                  toast.error(toUserSafeErrorMessage(err));
                 } finally {
                   setReporting(false);
                 }

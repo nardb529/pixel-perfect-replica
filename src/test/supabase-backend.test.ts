@@ -10,6 +10,11 @@ import {
   validateListing,
 } from "@/lib/campus/data";
 import {
+  checkIdAndProfilePair,
+  hammingDistanceHex,
+  verifyImageBinarySignature,
+} from "@/lib/campus/idVerification";
+import {
   getSupabaseClient,
   getVisitorSessionId,
   isSchemaMissingError,
@@ -300,11 +305,56 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     }
   });
 
-  it("adapts viewport safe areas and elevates floating navbar above the very bottom", () => {
+  it("adapts viewport safe areas, elevates floating navbar, and increases dock tap target size", () => {
     expect(stylesCss).toContain("bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));");
+    expect(stylesCss).toContain("max-width: 368px;\n    height: 68px;");
     expect(stylesCss).toContain(
-      "padding: 10px max(12px, env(safe-area-inset-right)) calc(126px + env(safe-area-inset-bottom))",
+      "padding: 10px max(12px, env(safe-area-inset-right)) calc(134px + env(safe-area-inset-bottom))",
     );
     expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
+  });
+
+  it("enforces seller verification security layer with private ID storage and verified-seller listing RLS", () => {
+    expect(setupSql).toContain("('seller-verifications', 'seller-verifications', false");
+    expect(setupSql).toContain(
+      'create policy "Owners and admins view seller verification documents"',
+    );
+    expect(setupSql).toContain(
+      'create policy "Verified non-suspended sellers insert own listings"',
+    );
+    expect(setupSql).toContain("p.verification_status = 'verified'");
+    const publicViewMatch = setupSql.match(
+      /create or replace view public\.public_seller_profiles[\s\S]*?where p\.is_suspended = false;/i,
+    );
+    expect(publicViewMatch?.[0]).toBeTruthy();
+    expect(publicViewMatch?.[0]).not.toContain("id_document_path");
+    expect(publicViewMatch?.[0]).not.toContain("id_document_type");
+    expect(publicViewMatch?.[0]).not.toContain("verification_checks");
+    expect(setupSql).toContain("verification_checks jsonb");
+
+    const adminFn = readFileSync(
+      join(process.cwd(), "supabase/functions/admin-moderate/index.ts"),
+      "utf8",
+    );
+    expect(adminFn).toContain('"Draft"');
+    expect(adminFn).toContain('"Unavailable"');
+    expect(adminFn).toContain('"Archived"');
+  });
+
+  it("verifies ID image magic-byte signatures and blocks duplicate ID/profile images", async () => {
+    const jpegBytes = new Uint8Array(5000);
+    jpegBytes.set([0xff, 0xd8, 0xff, 0xe0], 0);
+    const validJpeg = new File([jpegBytes], "id.jpg", { type: "image/jpeg" });
+    expect(await verifyImageBinarySignature(validJpeg)).toEqual({ valid: true, format: "JPEG" });
+
+    const spoofBytes = new Uint8Array(5000);
+    spoofBytes.set([0x3c, 0x73, 0x76, 0x67], 0); // <svg
+    const spoofedFile = new File([spoofBytes], "fake.jpg", { type: "image/jpeg" });
+    const spoofResult = await verifyImageBinarySignature(spoofedFile);
+    expect(spoofResult.valid).toBe(false);
+
+    expect(hammingDistanceHex("0f0f0f0f0f0f0f0f", "0f0f0f0f0f0f0f0f")).toBe(0);
+    expect(checkIdAndProfilePair("0f0f0f0f0f0f0f0f", "0f0f0f0f0f0f0f0e")).toMatch(/same photo/i);
+    expect(checkIdAndProfilePair("0000000000000000", "ffffffffffffffff")).toBe("");
   });
 });

@@ -59,12 +59,15 @@ export function isSchemaMissingError(err: unknown): boolean {
   const message = typeof record.message === "string" ? record.message.toLowerCase() : "";
   return (
     code === "PGRST202" ||
+    code === "PGRST204" ||
     code === "PGRST205" ||
     code === "42P01" ||
+    code === "42703" ||
     code === "42883" ||
     message.includes("schema cache") ||
     message.includes("could not find the table") ||
-    message.includes("could not find the function")
+    message.includes("could not find the function") ||
+    (message.includes("column") && message.includes("does not exist"))
   );
 }
 

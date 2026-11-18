@@ -12,6 +12,7 @@ export interface SignUpPayload {
   universityName?: string | undefined;
   phoneNumber?: string | undefined;
   whatsappNumber?: string | undefined;
+  isStudent?: boolean | undefined;
 }
 
 export const authenticationService = {
@@ -57,6 +58,7 @@ export const authenticationService = {
           university_name: payload.universityName ?? null,
           phone_number: payload.phoneNumber?.trim() || null,
           whatsapp_number: payload.whatsappNumber?.trim() || null,
+          is_student: payload.isStudent ?? true,
         },
       },
     });

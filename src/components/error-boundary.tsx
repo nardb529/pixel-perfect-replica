@@ -61,10 +61,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <AlertTriangle size={24} />
             </span>
             <p className="error-boundary-eyebrow">CampusLoop</p>
-            <h1 className="error-boundary-title">Something unexpected happened</h1>
+            <h1 className="error-boundary-title">Technical issue</h1>
             <p className="error-boundary-desc">
-              We caught an unexpected display error so your session stays safe. Try recovering this
-              view, reloading the page, or heading back to Discover.
+              We&apos;re experiencing a brief technical issue, and it is being worked on. Try again,
+              reload the page, or return to Discover.
             </p>
             <div className="error-boundary-actions">
               <button

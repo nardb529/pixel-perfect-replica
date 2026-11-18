@@ -119,6 +119,13 @@ create table if not exists public.profiles (
   account_type public.account_type_enum not null default 'Both',
   primary_university_id uuid references public.universities(id) on delete set null,
   verification_status public.verification_status_enum not null default 'unverified',
+  is_student boolean not null default true,
+  id_document_type text check (id_document_type is null or id_document_type in ('Student ID', 'Ghana Card', 'Voters ID')),
+  id_document_path text,
+  verification_photo_confirmed boolean not null default false,
+  verification_submitted_at timestamptz,
+  verification_note text,
+  verification_checks jsonb,
   role public.user_role_enum not null default 'user',
   is_suspended boolean not null default false,
   notification_preferences jsonb not null default '{"listing_updates": true, "announcements": true, "enquiries": true}'::jsonb,
@@ -126,7 +133,22 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.profiles add column if not exists is_student boolean not null default true;
+alter table public.profiles add column if not exists id_document_type text;
+alter table public.profiles add column if not exists id_document_path text;
+alter table public.profiles add column if not exists verification_photo_confirmed boolean not null default false;
+alter table public.profiles add column if not exists verification_submitted_at timestamptz;
+alter table public.profiles add column if not exists verification_note text;
+alter table public.profiles add column if not exists verification_checks jsonb;
+
+do $$ begin
+  alter table public.profiles
+    add constraint chk_profiles_id_document_type
+    check (id_document_type is null or id_document_type in ('Student ID', 'Ghana Card', 'Voters ID'));
+exception when duplicate_object then null; end $$;
+
 create index if not exists idx_profiles_university on public.profiles (primary_university_id);
+create index if not exists idx_profiles_verification_status on public.profiles (verification_status) where verification_status = 'pending';
 create index if not exists idx_profiles_role on public.profiles (role) where role = 'admin';
 create index if not exists idx_profiles_username_trgm on public.profiles using gin (username gin_trgm_ops);
 
@@ -433,12 +455,32 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_valid_submission boolean;
 begin
   -- Allow privileged postgres/service_role operations (auth.uid() is null) or verified admins
   if auth.uid() is not null and not public.is_admin() then
     new.role := old.role;
-    new.verification_status := old.verification_status;
     new.is_suspended := old.is_suspended;
+    new.verification_note := old.verification_note;
+
+    v_valid_submission :=
+      nullif(trim(coalesce(new.profile_image, '')), '') is not null
+      and nullif(trim(coalesce(new.id_document_path, '')), '') is not null
+      and new.verification_photo_confirmed = true
+      and (
+        (new.is_student = true and new.id_document_type = 'Student ID')
+        or (new.is_student = false and new.id_document_type in ('Ghana Card', 'Voters ID'))
+      );
+
+    -- Non-admins may only transition to 'pending' with a valid Student ID or Ghana Card / Voter's ID + profile photo
+    if new.verification_status = 'pending' and v_valid_submission then
+      new.verification_status := 'pending';
+      new.verification_submitted_at := coalesce(new.verification_submitted_at, now());
+      new.verification_note := null;
+    else
+      new.verification_status := old.verification_status;
+    end if;
   end if;
   return new;
 end;
@@ -546,6 +588,7 @@ begin
     whatsapp_number,
     account_type,
     primary_university_id,
+    is_student,
     role
   ) values (
     new.id,
@@ -556,13 +599,23 @@ begin
     nullif(trim(new.raw_user_meta_data->>'whatsapp_number'), ''),
     acct_type,
     uni_id,
+    coalesce((new.raw_user_meta_data->>'is_student')::boolean, true),
     'user'
   )
   on conflict (id) do nothing;
 
   if uni_id is not null then
     insert into public.user_universities (user_id, university_id, affiliation_type, is_primary)
-    values (new.id, uni_id, 'Student', true)
+    values (
+      new.id,
+      uni_id,
+      case
+        when coalesce((new.raw_user_meta_data->>'is_student')::boolean, true) then 'Student'::public.affiliation_type_enum
+        when acct_type = 'Service Provider' then 'Service Provider'::public.affiliation_type_enum
+        else 'Business'::public.affiliation_type_enum
+      end,
+      true
+    )
     on conflict (user_id, university_id) do nothing;
   end if;
 
@@ -1347,14 +1400,23 @@ create policy "Public views active listings; sellers view own; admins view all"
   );
 
 drop policy if exists "Authenticated non-suspended sellers insert own listings" on public.listings;
-create policy "Authenticated non-suspended sellers insert own listings"
+drop policy if exists "Verified non-suspended sellers insert own listings" on public.listings;
+create policy "Verified non-suspended sellers insert own listings"
   on public.listings for insert
   with check (
     auth.uid() is not null
     and auth.uid() = seller_id
     and exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.is_suspended = false
+      where p.id = auth.uid()
+        and p.is_suspended = false
+        and (
+          p.role = 'admin'
+          or (
+            p.verification_status = 'verified'
+            and nullif(trim(coalesce(p.profile_image, '')), '') is not null
+          )
+        )
     )
   );
 
@@ -1368,7 +1430,9 @@ create policy "Sellers update own listings; admins moderate"
       auth.uid() = seller_id
       and exists (
         select 1 from public.profiles p
-        where p.id = auth.uid() and p.is_suspended = false
+        where p.id = auth.uid()
+          and p.is_suspended = false
+          and (status <> 'Active' or p.verification_status = 'verified')
       )
     )
   );
@@ -1658,17 +1722,30 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values
   ('profile-images', 'profile-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/avif']),
   ('listing-images', 'listing-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/avif']),
-  ('university-logos', 'university-logos', true, 2097152, array['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'])
+  ('university-logos', 'university-logos', true, 2097152, array['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']),
+  ('seller-verifications', 'seller-verifications', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/avif'])
 on conflict (id) do update set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
--- Public read access for marketplace/profile/university images
+-- Public read access for marketplace/profile/university images (NEVER seller-verifications)
 drop policy if exists "Public read CampusLoop media buckets" on storage.objects;
 create policy "Public read CampusLoop media buckets"
   on storage.objects for select
   using (bucket_id in ('profile-images', 'listing-images', 'university-logos'));
+
+-- Strictly private ID verification documents: readable ONLY by the document owner or platform admins
+drop policy if exists "Owners and admins view seller verification documents" on storage.objects;
+create policy "Owners and admins view seller verification documents"
+  on storage.objects for select
+  using (
+    bucket_id = 'seller-verifications'
+    and (
+      public.is_admin()
+      or (auth.uid() is not null and (storage.foldername(name))[1] = auth.uid()::text)
+    )
+  );
 
 -- Sellers upload/update/delete only inside their own {auth.uid()}/ folder
 drop policy if exists "Users upload own profile or listing images" on storage.objects;
@@ -1676,7 +1753,7 @@ create policy "Users upload own profile or listing images"
   on storage.objects for insert
   with check (
     auth.uid() is not null
-    and bucket_id in ('profile-images', 'listing-images')
+    and bucket_id in ('profile-images', 'listing-images', 'seller-verifications')
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
@@ -1685,7 +1762,7 @@ create policy "Users update own profile or listing images"
   on storage.objects for update
   using (
     auth.uid() is not null
-    and bucket_id in ('profile-images', 'listing-images')
+    and bucket_id in ('profile-images', 'listing-images', 'seller-verifications')
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
@@ -1694,7 +1771,7 @@ create policy "Users delete own profile or listing images"
   on storage.objects for delete
   using (
     (auth.uid() is not null
-      and bucket_id in ('profile-images', 'listing-images')
+      and bucket_id in ('profile-images', 'listing-images', 'seller-verifications')
       and (storage.foldername(name))[1] = auth.uid()::text)
     or public.is_admin()
   );

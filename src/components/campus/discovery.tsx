@@ -210,7 +210,7 @@ export function DiscoverPage() {
             ))}
           </div>
         ) : listingsError && results.length === 0 ? (
-          <Empty title="Could not load listings" text={listingsError}>
+          <Empty title="Listings temporarily unavailable" text={listingsError}>
             <Button variant="outline" onClick={() => void refreshListings()}>
               Retry
             </Button>

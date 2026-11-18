@@ -17,11 +17,13 @@ import {
   Bell,
   TrendingUp,
   Shield,
+  Store as StoreIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useCampus } from "./store";
+import { SellerVerificationCard } from "./verification";
 import {
   Shell,
   HeroAmbient,
@@ -32,7 +34,9 @@ import {
   PagePendingFallback,
 } from "./shared";
 import {
+  TECHNICAL_ISSUE_MESSAGE,
   ownsListing,
+  toUserSafeErrorMessage,
   validateListing,
   formatListingPrice,
   priceTypes,
@@ -159,7 +163,7 @@ export function DashboardPage() {
     e.preventDefault();
     if (!user) return;
     if (!backendConfigured) {
-      toast.error("Live service is currently unavailable. Please try again shortly.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
 
@@ -208,7 +212,7 @@ export function DashboardPage() {
       await refreshProfile();
       toast.success("Settings saved to your CampusLoop account");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save settings");
+      toast.error(toUserSafeErrorMessage(err));
     } finally {
       setSavingSettings(false);
     }
@@ -216,7 +220,7 @@ export function DashboardPage() {
 
   async function handleStatusChange(listing: Listing, nextStatus: Listing["status"]) {
     if (!backendConfigured) {
-      toast.error("Live service is currently unavailable. Please try again shortly.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     if (isSuspended && nextStatus === "Active") {
@@ -229,13 +233,13 @@ export function DashboardPage() {
       await Promise.all([refreshMyListings(), refreshListings()]);
       toast.success(`${listing.title} marked as ${nextStatus}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update listing status");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
   async function handleDeleteListing(target: Listing) {
     if (!backendConfigured) {
-      toast.error("Live service is currently unavailable. Please try again shortly.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     try {
@@ -244,7 +248,7 @@ export function DashboardPage() {
       setDeleting(null);
       toast.success("Listing removed");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not delete listing");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -254,7 +258,7 @@ export function DashboardPage() {
   ) {
     if (!user) return;
     if (!backendConfigured) {
-      toast.error("Live service is currently unavailable. Please try again shortly.");
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     const nextPrefs = {
@@ -267,8 +271,8 @@ export function DashboardPage() {
       await notificationService.updatePreferences(nextPrefs);
       await refreshProfile();
       toast.success("Notification preferences updated");
-    } catch {
-      toast.error("Could not update notification preferences");
+    } catch (err) {
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -292,7 +296,15 @@ export function DashboardPage() {
                 </Link>
               </Button>
             )}
-            {!isSuspended && (
+            {user.id && (
+              <Button variant="outline" asChild>
+                <Link to="/seller/$id" params={{ id: user.id }}>
+                  <StoreIcon size={15} />
+                  View my shop
+                </Link>
+              </Button>
+            )}
+            {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
               <Button className="dashboard-create-btn" asChild>
                 <Link to="/post">
                   <Plus size={16} />
@@ -316,7 +328,7 @@ export function DashboardPage() {
             <Bell size={15} />
             Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
           </Button>
-          {!isSuspended && (
+          {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
             <Button variant="ghost" asChild>
               <Link to="/post">Create Listing</Link>
             </Button>
@@ -341,6 +353,10 @@ export function DashboardPage() {
             suspended. Contact CampusLoop support if you believe this is an error.
           </p>
         </section>
+      )}
+
+      {!isSuspended && user.role !== "admin" && user.verificationStatus !== "verified" && (
+        <SellerVerificationCard />
       )}
 
       {tab === "Settings" ? (
@@ -926,6 +942,20 @@ export function PostPage({
     );
   }
 
+  if (!editId && user.role !== "admin" && user.verificationStatus !== "verified") {
+    return (
+      <Shell>
+        <div className="post-wrap">
+          <Link to="/dashboard" className="back-link">
+            <ArrowLeft size={15} />
+            Dashboard
+          </Link>
+          <SellerVerificationCard />
+        </div>
+      </Shell>
+    );
+  }
+
   if (editId && !existing) {
     return (
       <Shell>
@@ -976,7 +1006,7 @@ export function PostPage({
   async function upload(files: FileList | null) {
     if (!files || !files.length) return;
     if (!backendConfigured) {
-      setError("Live media storage is currently unavailable. Please try again later.");
+      setError(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
     const selected = Array.from(files);
@@ -998,9 +1028,7 @@ export function PostPage({
       setDraft((prev) => ({ ...prev, images: [...prev.images, ...uploaded] }));
       toast.success(`${uploaded.length} photo${uploaded.length > 1 ? "s" : ""} uploaded`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "This image could not be uploaded. Try another photo.",
-      );
+      setError(toUserSafeErrorMessage(err));
     } finally {
       setUploadingImages(false);
     }
@@ -1035,7 +1063,7 @@ export function PostPage({
     }
 
     if (!backendConfigured) {
-      setError("Live marketplace service is currently unavailable. Please try again later.");
+      setError(TECHNICAL_ISSUE_MESSAGE);
       return;
     }
 
@@ -1090,7 +1118,7 @@ export function PostPage({
       await Promise.all([refreshMyListings(), refreshListings()]);
       setPublished(savedListing.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to publish listing.");
+      setError(toUserSafeErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

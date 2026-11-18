@@ -15,7 +15,7 @@ import type {
   SearchListingRow,
   UniversityRecord,
 } from "@/lib/supabase/database.types";
-import { isSafeMediaUrl, type Listing } from "@/lib/campus/data";
+import { UserInputError, isSafeMediaUrl, type Listing } from "@/lib/campus/data";
 
 export interface SearchListingsParams {
   universityFilter?: string | null | undefined;
@@ -342,12 +342,16 @@ export const listingService = {
         ${LISTING_BASE_COLUMNS},
         category:categories(id, name),
         images:listing_images(image_url, display_order),
+        product_details(condition, brand, stock_status),
+        service_details(starting_price, duration, service_area, delivery_method),
         targets:listing_universities(university:universities(short_name))
       `,
       )
       .eq("seller_id", sellerId)
       .eq("status", "Active")
-      .order("created_at", { ascending: false });
+      .order("is_featured", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(60);
 
     if (error) throw error;
     return (data || []).map((row) => mapSellerRowToListing(row, "Campus Seller", "Ghana Campus"));
@@ -468,10 +472,10 @@ export const listingService = {
   async uploadListingImage(file: File): Promise<{ imageUrl: string; storagePath: string }> {
     const supabase = requireSupabase();
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
-      throw new Error("Only JPG, PNG, WebP or AVIF images are allowed.");
+      throw new UserInputError("Only JPG, PNG, WebP or AVIF images are allowed.");
     }
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error("Images must be 5 MB or smaller.");
+      throw new UserInputError("Images must be 5 MB or smaller.");
     }
 
     const user = await getSessionUser(supabase);

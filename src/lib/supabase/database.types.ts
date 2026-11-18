@@ -1,5 +1,8 @@
+import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
+
 export type AccountType = "Product Seller" | "Service Provider" | "Both";
 export type VerificationStatus = "unverified" | "pending" | "verified";
+export type IdDocumentType = "Student ID" | "Ghana Card" | "Voters ID";
 export type UserRole = "user" | "admin";
 export type AffiliationType = "Student" | "Alumni" | "Business" | "Service Provider" | "Other";
 export type CategoryType = "product" | "service";
@@ -70,6 +73,13 @@ export interface ProfileRecord {
   account_type: AccountType;
   primary_university_id: string | null;
   verification_status: VerificationStatus;
+  is_student: boolean;
+  id_document_type: IdDocumentType | null;
+  id_document_path: string | null;
+  verification_photo_confirmed: boolean;
+  verification_submitted_at: string | null;
+  verification_note: string | null;
+  verification_checks?: VerificationChecksPayload | null | undefined;
   role: UserRole;
   is_suspended: boolean;
   notification_preferences: NotificationPreferences;

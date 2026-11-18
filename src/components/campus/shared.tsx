@@ -538,7 +538,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
               >
                 <span className="dock-icon-wrap">
-                  <n.icon size={20} strokeWidth={active ? 2.3 : 1.85} />
+                  <n.icon size={22} strokeWidth={active ? 2.3 : 1.9} />
                 </span>
                 {active && <span className="dock-active-dot" aria-hidden="true" />}
               </Link>
@@ -553,7 +553,7 @@ export function Shell({ children }: { children: ReactNode }) {
             title="Post a listing"
           >
             <span className="dock-post-orb">
-              <Plus size={22} strokeWidth={2.5} />
+              <Plus size={25} strokeWidth={2.5} />
             </span>
           </button>
 
@@ -570,7 +570,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
               >
                 <span className="dock-icon-wrap">
-                  <n.icon size={20} strokeWidth={active ? 2.3 : 1.85} />
+                  <n.icon size={22} strokeWidth={active ? 2.3 : 1.9} />
                   {showSavedDot && <span className="dock-badge" aria-hidden="true" />}
                 </span>
                 {active && <span className="dock-active-dot" aria-hidden="true" />}
@@ -660,12 +660,17 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
             </span>
           </p>
           <div className="listing-byline">
-            <span className="inline-flex items-center gap-1">
-              {listing.seller}
+            <Link
+              to="/seller/$id"
+              params={{ id: listing.sellerId || listing.id }}
+              className="listing-seller-link inline-flex items-center gap-1"
+              aria-label={`Visit ${listing.seller}'s shop`}
+            >
+              <span>{listing.seller}</span>
               {listing.verificationStatus === "verified" && (
                 <BadgeCheck size={12} aria-label="Verified seller" className="text-primary" />
               )}
-            </span>
+            </Link>
             <span>{listing.time}</span>
           </div>
           <button

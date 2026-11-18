@@ -7,6 +7,26 @@ import type {
 
 export const BRAND = "CampusLoop";
 
+export const TECHNICAL_ISSUE_MESSAGE =
+  "Technical issue — it is being worked on. Please try again shortly.";
+
+export class UserInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserInputError";
+  }
+}
+
+export function toUserSafeErrorMessage(err: unknown): string {
+  if (err instanceof UserInputError && err.message.trim()) {
+    return err.message;
+  }
+  if (err !== undefined && err !== null) {
+    console.error("[CampusLoop handled error]", err);
+  }
+  return TECHNICAL_ISSUE_MESSAGE;
+}
+
 export const universities = [
   "KNUST",
   "University of Ghana",

@@ -2,18 +2,27 @@ import {
   compressImageFile,
   getSessionUser,
   getSupabaseClient,
+  isSchemaMissingError,
   requireSupabase,
 } from "@/lib/supabase/client";
+import { UserInputError } from "@/lib/campus/data";
+import {
+  inspectVerificationImage,
+  type ImageValidityResult,
+  type VerificationChecksPayload,
+} from "@/lib/campus/idVerification";
 import type {
   AccountType,
   AffiliationType,
+  IdDocumentType,
   ProfileRecord,
   PublicSellerProfileRecord,
   UserUniversityRecord,
 } from "@/lib/supabase/database.types";
 
-const PROFILE_COLUMNS =
-  "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, role, is_suspended, notification_preferences, created_at, updated_at";
+const PROFILE_COLUMNS_BASE =
+  "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, is_student, id_document_type, id_document_path, verification_photo_confirmed, verification_submitted_at, verification_note, role, is_suspended, notification_preferences, created_at, updated_at";
+const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, verification_checks`;
 const PUBLIC_SELLER_COLUMNS =
   "id, full_name, username, profile_image, bio, account_type, primary_university_id, verification_status, preferred_contact_method, public_contact_handle, is_suspended, created_at";
 
@@ -48,7 +57,18 @@ export const profileService = {
       .eq("id", targetId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      if (isSchemaMissingError(error)) {
+        const fallback = await client
+          .from("profiles")
+          .select(PROFILE_COLUMNS_BASE)
+          .eq("id", targetId)
+          .maybeSingle();
+        if (fallback.error) throw fallback.error;
+        return fallback.data as ProfileRecord | null;
+      }
+      throw error;
+    }
     return data as ProfileRecord | null;
   },
 
@@ -98,7 +118,19 @@ export const profileService = {
       .select(PROFILE_COLUMNS)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (isSchemaMissingError(error)) {
+        const fallback = await supabase
+          .from("profiles")
+          .update(sanitized)
+          .eq("id", user.id)
+          .select(PROFILE_COLUMNS_BASE)
+          .single();
+        if (fallback.error) throw fallback.error;
+        return fallback.data as ProfileRecord;
+      }
+      throw error;
+    }
     return data as ProfileRecord;
   },
 
@@ -150,10 +182,15 @@ export const profileService = {
   async uploadProfileImage(file: File): Promise<string> {
     const supabase = requireSupabase();
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
-      throw new Error("Choose a JPG, PNG, or WebP image file.");
+      throw new UserInputError("Choose a JPG, PNG, or WebP image file.");
     }
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error("Profile images must be 5 MB or smaller.");
+      throw new UserInputError("Profile images must be 5 MB or smaller.");
+    }
+
+    const validity = await inspectVerificationImage(file, "profile");
+    if (!validity.valid) {
+      throw new UserInputError(validity.reason || "Profile photo failed image quality checks.");
     }
 
     const user = await getSessionUser(supabase);
@@ -181,5 +218,133 @@ export const profileService = {
 
     const { data } = supabase.storage.from("profile-images").getPublicUrl(path);
     return data.publicUrl;
+  },
+
+  async uploadVerificationId(
+    file: File,
+    expectedDocType?: IdDocumentType,
+  ): Promise<{ path: string; signedUrl: string; validity: ImageValidityResult }> {
+    const supabase = requireSupabase();
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      throw new UserInputError("Upload a clear JPG, PNG, or WebP photo of your ID card.");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new UserInputError("ID document image must be 5 MB or smaller.");
+    }
+
+    const validity = await inspectVerificationImage(file, "id", expectedDocType);
+    if (!validity.valid) {
+      throw new UserInputError(
+        validity.reason || "Uploaded ID image failed quality & validity checks.",
+      );
+    }
+
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Sign in to upload verification documents.");
+
+    const optimized = await compressImageFile(file, 1400, 0.88);
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/avif": "avif",
+    };
+    const ext = mimeToExt[optimized.type] || "jpg";
+    const path = `${user.id}/id-doc-${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("seller-verifications")
+      .upload(path, optimized, {
+        upsert: true,
+        contentType: optimized.type,
+        cacheControl: "3600",
+      });
+
+    if (uploadErr) throw uploadErr;
+
+    const { data: signedData, error: signErr } = await supabase.storage
+      .from("seller-verifications")
+      .createSignedUrl(path, 600);
+
+    if (signErr) throw signErr;
+    return { path, signedUrl: signedData.signedUrl, validity };
+  },
+
+  async getSignedVerificationDocUrl(path?: string | null): Promise<string | null> {
+    const client = getSupabaseClient();
+    if (!client || !path) return null;
+    const { data, error } = await client.storage
+      .from("seller-verifications")
+      .createSignedUrl(path, 300);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  },
+
+  async submitSellerVerification(input: {
+    isStudent: boolean;
+    idDocumentType: IdDocumentType;
+    idDocumentPath: string;
+    profileImageUrl: string;
+    photoMatchConfirmed: boolean;
+    verificationChecks?: VerificationChecksPayload | undefined;
+  }): Promise<ProfileRecord> {
+    if (input.isStudent && input.idDocumentType !== "Student ID") {
+      throw new UserInputError("Students must upload a valid Student ID.");
+    }
+    if (!input.isStudent && !["Ghana Card", "Voters ID"].includes(input.idDocumentType)) {
+      throw new UserInputError("Non-students must upload either a Ghana Card or Voter's ID.");
+    }
+    if (!input.idDocumentPath.trim()) {
+      throw new UserInputError("Upload a clear photo of your required ID card.");
+    }
+    if (!input.profileImageUrl.trim()) {
+      throw new UserInputError("Upload a real profile photo matching the person on your ID.");
+    }
+    if (!input.photoMatchConfirmed) {
+      throw new UserInputError(
+        "Confirm that your profile photo matches the person on your ID card.",
+      );
+    }
+
+    const supabase = requireSupabase();
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
+
+    const basePayload = {
+      is_student: input.isStudent,
+      id_document_type: input.idDocumentType,
+      id_document_path: input.idDocumentPath.trim(),
+      profile_image: input.profileImageUrl.trim(),
+      verification_photo_confirmed: true,
+      verification_submitted_at: new Date().toISOString(),
+      // Only an administrator may approve a seller account; submissions always enter pending review
+      verification_status: "pending" as const,
+    };
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(
+        input.verificationChecks
+          ? { ...basePayload, verification_checks: input.verificationChecks }
+          : basePayload,
+      )
+      .eq("id", user.id)
+      .select(PROFILE_COLUMNS)
+      .single();
+
+    if (error) {
+      if (isSchemaMissingError(error)) {
+        const fallback = await supabase
+          .from("profiles")
+          .update(basePayload)
+          .eq("id", user.id)
+          .select(PROFILE_COLUMNS_BASE)
+          .single();
+        if (fallback.error) throw fallback.error;
+        return fallback.data as ProfileRecord;
+      }
+      throw error;
+    }
+    return data as ProfileRecord;
   },
 };

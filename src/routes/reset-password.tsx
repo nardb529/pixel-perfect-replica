@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Logo, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
-import { validatePassword } from "@/lib/campus/data";
+import { toUserSafeErrorMessage, validatePassword } from "@/lib/campus/data";
 import { pageHead } from "@/lib/campus/meta";
 import { authenticationService } from "@/services";
 
@@ -80,7 +80,7 @@ function ResetPasswordPage() {
       setDone(true);
       toast.success("Password updated");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update password.");
+      setError(toUserSafeErrorMessage(err));
     } finally {
       setSaving(false);
     }

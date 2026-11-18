@@ -19,6 +19,12 @@ type AdminAction =
   | { action: "moderate_listing"; listingId: string; status: string; note?: string }
   | { action: "toggle_featured"; listingId: string; featured: boolean }
   | { action: "suspend_user"; userId: string; suspended: boolean; note?: string }
+  | {
+      action: "verify_user";
+      userId: string;
+      status: "verified" | "pending" | "unverified";
+      note?: string;
+    }
   | { action: "resolve_report"; reportId: string; status: string; note?: string };
 
 Deno.serve(async (req: Request) => {
@@ -88,7 +94,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const VALID_LISTING_STATUSES = new Set(["Active", "Paused", "Sold", "Pending", "Rejected"]);
+    const VALID_LISTING_STATUSES = new Set([
+      "Draft",
+      "Active",
+      "Paused",
+      "Sold",
+      "Unavailable",
+      "Pending",
+      "Rejected",
+      "Archived",
+    ]);
     const VALID_REPORT_STATUSES = new Set(["open", "reviewing", "resolved", "dismissed"]);
 
     let payload: AdminAction;
@@ -228,6 +243,51 @@ Deno.serve(async (req: Request) => {
         notes: payload.note?.slice(0, 500) ?? null,
       });
       if (logErr) throw new Error(logErr.message);
+    } else if (payload.action === "verify_user") {
+      if (
+        !UUID_REGEX.test(payload.userId) ||
+        !new Set(["verified", "pending", "unverified"]).has(payload.status)
+      ) {
+        return new Response(JSON.stringify({ error: "Invalid userId or verification status" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const cleanNote = payload.note?.trim().slice(0, 500) || null;
+      const { error: verifyErr } = await adminClient
+        .from("profiles")
+        .update({
+          verification_status: payload.status,
+          verification_note: payload.status === "verified" ? null : cleanNote,
+        })
+        .eq("id", payload.userId);
+      if (verifyErr) throw new Error(verifyErr.message);
+
+      const { error: logErr } = await adminClient.from("moderation_logs").insert({
+        admin_id: user.id,
+        action: `user_verification_${payload.status}`,
+        target_type: "profile",
+        target_id: payload.userId,
+        notes: cleanNote,
+      });
+      if (logErr) throw new Error(logErr.message);
+
+      const { error: notifErr } = await adminClient.from("notifications").insert({
+        user_id: payload.userId,
+        title:
+          payload.status === "verified"
+            ? "Seller account verified"
+            : payload.status === "pending"
+              ? "Verification under review"
+              : "Verification needs another photo",
+        message:
+          payload.status === "verified"
+            ? "Your CampusLoop seller verification is approved. You can now post products and services."
+            : cleanNote || `Your verification status was updated to ${payload.status}.`,
+        notification_type: "account_update",
+      });
+      if (notifErr) throw new Error(notifErr.message);
     } else {
       return new Response(JSON.stringify({ error: "Unsupported moderation action" }), {
         status: 400,

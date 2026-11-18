@@ -15,7 +15,12 @@ const corsHeaders = {
   "Cache-Control": "no-store",
 };
 
-const ALLOWED_BUCKETS = new Set(["listing-images", "profile-images", "university-logos"]);
+const ALLOWED_BUCKETS = new Set([
+  "listing-images",
+  "profile-images",
+  "university-logos",
+  "seller-verifications",
+]);
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -163,14 +168,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: publicUrlData } = adminClient.storage.from(bucket).getPublicUrl(objectPath);
+    const isPrivateBucket = bucket === "seller-verifications";
+    const publicUrl = isPrivateBucket
+      ? null
+      : adminClient.storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
 
     return new Response(
       JSON.stringify({
         path: objectPath,
         token: data.token,
         signedUrl: data.signedUrl,
-        publicUrl: publicUrlData.publicUrl,
+        publicUrl,
       }),
       {
         status: 200,

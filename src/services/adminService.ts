@@ -1,4 +1,9 @@
-import { compressImageFile, getSessionUser, requireSupabase } from "@/lib/supabase/client";
+import {
+  compressImageFile,
+  getSessionUser,
+  isSchemaMissingError,
+  requireSupabase,
+} from "@/lib/supabase/client";
 import { invalidateCategoryCache } from "@/services/categoryService";
 import { invalidateUniversityCache } from "@/services/universityService";
 import type {
@@ -82,14 +87,25 @@ export const adminService = {
 
   async listAllProfiles(limit = 120): Promise<ProfileRecord[]> {
     const supabase = requireSupabase();
+    const baseCols =
+      "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, is_student, id_document_type, id_document_path, verification_photo_confirmed, verification_submitted_at, verification_note, role, is_suspended, notification_preferences, created_at, updated_at";
     const { data, error } = await supabase
       .from("profiles")
-      .select(
-        "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, role, is_suspended, notification_preferences, created_at, updated_at",
-      )
+      .select(`${baseCols}, verification_checks`)
       .order("created_at", { ascending: false })
       .limit(limit);
-    if (error) throw error;
+    if (error) {
+      if (isSchemaMissingError(error)) {
+        const fallback = await supabase
+          .from("profiles")
+          .select(baseCols)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (fallback.error) throw fallback.error;
+        return (fallback.data || []) as ProfileRecord[];
+      }
+      throw error;
+    }
     return (data || []) as ProfileRecord[];
   },
 
@@ -169,25 +185,29 @@ export const adminService = {
     note?: string,
   ): Promise<void> {
     const supabase = requireSupabase();
+    const cleanNote = note?.trim().slice(0, 500) || null;
     const { error } = await supabase
       .from("profiles")
-      .update({ verification_status: status })
+      .update({
+        verification_status: status,
+        verification_note: status === "verified" ? null : cleanNote,
+      })
       .eq("id", userId);
     if (error) throw error;
 
-    await writeAuditLog(`user_verification_${status}`, "profile", userId, note);
+    await writeAuditLog(`user_verification_${status}`, "profile", userId, cleanNote ?? undefined);
     const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
       title:
         status === "verified"
-          ? "Campus seller badge approved"
+          ? "Seller account verified"
           : status === "pending"
             ? "Verification under review"
-            : "Verification status updated",
+            : "Seller verification needs an update",
       message:
         status === "verified"
-          ? "Your account now displays the verified CampusLoop seller badge."
-          : note || `Your seller verification status was updated to ${status}.`,
+          ? "Your CampusLoop seller verification is approved. You can now post products and services."
+          : cleanNote || `Your seller verification status was updated to ${status}.`,
       notification_type: "account_update" as NotificationType,
     });
     if (notifErr) throw notifErr;

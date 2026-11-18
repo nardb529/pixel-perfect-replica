@@ -28,6 +28,8 @@ import {
   Upload,
   UserCog,
   ArrowUpRight,
+  CreditCard,
+  FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -41,8 +43,8 @@ import {
   AnimatedSelect,
   SectionTitle,
 } from "./shared";
-import { isSchemaMissingError } from "@/lib/supabase/client";
-import { adminService, categoryService, universityService } from "@/services";
+import { TECHNICAL_ISSUE_MESSAGE, isSafeMediaUrl, toUserSafeErrorMessage } from "@/lib/campus/data";
+import { adminService, categoryService, profileService, universityService } from "@/services";
 import type { AdminListingSummary, ModerationLogRecord } from "@/services/adminService";
 import type {
   AdminDashboardSummary,
@@ -162,6 +164,12 @@ export function AdminPage() {
   const [rejectNote, setRejectNote] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [roleTarget, setRoleTarget] = useState<RoleTarget | null>(null);
+  const [verifyTarget, setVerifyTarget] = useState<ProfileRecord | null>(null);
+  const [verifyDocUrl, setVerifyDocUrl] = useState<string | null>(null);
+  const [verifyLoadingDoc, setVerifyLoadingDoc] = useState(false);
+  const [verifyRejectNote, setVerifyRejectNote] = useState("");
+  const [confirmAuthenticId, setConfirmAuthenticId] = useState(false);
+  const [confirmFaceMatch, setConfirmFaceMatch] = useState(false);
 
   // University form
   const [editingUniId, setEditingUniId] = useState<string | undefined>(undefined);
@@ -224,15 +232,9 @@ export function AdminPage() {
       setPromotionConfigs(promoRows);
       setAuditLogs(logRows);
     } catch (err) {
-      if (isSchemaMissingError(err)) {
-        setWorkspaceError(
-          "Your Supabase database tables have not been created yet. Run the SQL setup script in Supabase SQL Editor to activate live administration.",
-        );
-      } else {
-        const message = err instanceof Error ? err.message : "Failed to load admin records";
-        setWorkspaceError(message);
-        toast.error(message);
-      }
+      const safeMessage = toUserSafeErrorMessage(err);
+      setWorkspaceError(safeMessage);
+      toast.error(safeMessage);
     } finally {
       setLoadingAdmin(false);
     }
@@ -374,10 +376,7 @@ export function AdminPage() {
       <Shell>
         <section className="surface-panel hero-panel curve-accent">
           <HeroAmbient />
-          <Empty
-            title="Live admin service unavailable"
-            text="Administrator controls require an active backend connection."
-          >
+          <Empty title="Service temporarily unavailable" text={TECHNICAL_ISSUE_MESSAGE}>
             <Button asChild>
               <Link to="/discover">Back to marketplace</Link>
             </Button>
@@ -432,7 +431,7 @@ export function AdminPage() {
       toast.success(`${title} marked as ${nextStatus}`);
       await Promise.all([loadAdminWorkspace(), refreshListings()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update listing");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -457,7 +456,7 @@ export function AdminPage() {
       setDeleteTarget(null);
       await Promise.all([loadAdminWorkspace(), refreshListings()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not remove listing");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -467,7 +466,7 @@ export function AdminPage() {
       toast.success(nextFeatured ? "Marked as featured" : "Removed from featured");
       await Promise.all([loadAdminWorkspace(), refreshListings()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not update featured state");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -477,25 +476,53 @@ export function AdminPage() {
       toast.success(`Report marked ${nextStatus}`);
       await loadAdminWorkspace();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update report");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
-  async function handleUserVerification(prof: ProfileRecord, nextStatus: VerificationStatus) {
+  async function handleUserVerification(
+    prof: ProfileRecord,
+    nextStatus: VerificationStatus,
+    note?: string,
+  ) {
     try {
       await adminService.updateUserVerification(
         prof.id,
         nextStatus,
-        nextStatus === "verified" ? "Verified by platform admin" : "Verification revoked",
+        note ||
+          (nextStatus === "verified"
+            ? "Verified by platform admin"
+            : "Verification update requested"),
       );
       toast.success(
         nextStatus === "verified"
           ? `${prof.full_name} is now verified`
           : `Verification updated for ${prof.full_name}`,
       );
+      setVerifyTarget(null);
+      setVerifyDocUrl(null);
+      setVerifyRejectNote("");
       await loadAdminWorkspace();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update verification");
+      toast.error(toUserSafeErrorMessage(err));
+    }
+  }
+
+  async function openVerifyReview(prof: ProfileRecord) {
+    setVerifyTarget(prof);
+    setVerifyRejectNote(prof.verification_note || "");
+    setConfirmAuthenticId(false);
+    setConfirmFaceMatch(false);
+    setVerifyDocUrl(null);
+    if (!prof.id_document_path) return;
+    setVerifyLoadingDoc(true);
+    try {
+      const signed = await profileService.getSignedVerificationDocUrl(prof.id_document_path);
+      setVerifyDocUrl(signed);
+    } catch {
+      setVerifyDocUrl(null);
+    } finally {
+      setVerifyLoadingDoc(false);
     }
   }
 
@@ -507,7 +534,7 @@ export function AdminPage() {
       setRoleTarget(null);
       await loadAdminWorkspace();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to change account role");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -522,7 +549,7 @@ export function AdminPage() {
       setNewUniLogoUrl(url);
       toast.success("University logo uploaded");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Logo upload failed");
+      toast.error(toUserSafeErrorMessage(err));
     } finally {
       setUploadingLogo(false);
     }
@@ -574,7 +601,7 @@ export function AdminPage() {
       toast.success("University saved");
       await Promise.all([loadAdminWorkspace(), refreshMetadata()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save university");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -611,7 +638,7 @@ export function AdminPage() {
       toast.success("Category saved");
       await Promise.all([loadAdminWorkspace(), refreshMetadata()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save category");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -638,7 +665,7 @@ export function AdminPage() {
       setBroadcastMessage("");
       await Promise.all([loadAdminWorkspace(), refreshNotifications()]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not deliver announcement");
+      toast.error(toUserSafeErrorMessage(err));
     } finally {
       setSendingBroadcast(false);
     }
@@ -666,7 +693,7 @@ export function AdminPage() {
       toast.success("Promotion slot saved");
       await loadAdminWorkspace();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save promotion slot");
+      toast.error(toUserSafeErrorMessage(err));
     }
   }
 
@@ -759,7 +786,7 @@ export function AdminPage() {
 
       {workspaceError && (
         <section className="surface-panel section-panel admin-warning-panel" role="status">
-          <strong>Database setup notice:</strong> {workspaceError}
+          <strong>Notice:</strong> {workspaceError}
         </section>
       )}
 
@@ -1280,19 +1307,37 @@ export function AdminPage() {
                                   ? "Verified"
                                   : prof.verification_status}
                             </span>
+                            {` · ${prof.is_student ? "Student" : "Non-student"}`}
+                            {prof.id_document_type
+                              ? ` · ${prof.id_document_type === "Voters ID" ? "Voter's ID" : prof.id_document_type}`
+                              : ""}
                             {` · Joined ${formatShortDate(prof.created_at)}`}
                           </small>
                         </div>
                         <div className="admin-card-action">
+                          {(prof.id_document_path || prof.verification_status === "pending") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="whitespace-nowrap shrink-0"
+                              onClick={() => void openVerifyReview(prof)}
+                            >
+                              <FileCheck2 size={14} />
+                              Review ID
+                            </Button>
+                          )}
                           <Button
                             variant={isVerified ? "secondary" : "outline"}
                             size="sm"
                             className="whitespace-nowrap shrink-0"
                             onClick={() =>
-                              void handleUserVerification(
-                                prof,
-                                isVerified ? "unverified" : "verified",
-                              )
+                              !isVerified
+                                ? void openVerifyReview(prof)
+                                : void handleUserVerification(
+                                    prof,
+                                    "unverified",
+                                    "Verification revoked by administrator",
+                                  )
                             }
                           >
                             <BadgeCheck size={14} />
@@ -1349,11 +1394,7 @@ export function AdminPage() {
                                       );
                                       return loadAdminWorkspace();
                                     })
-                                    .catch((err) =>
-                                      toast.error(
-                                        err instanceof Error ? err.message : "Action failed",
-                                      ),
-                                    )
+                                    .catch((err) => toast.error(toUserSafeErrorMessage(err)))
                                 }
                               >
                                 {prof.is_suspended ? <RotateCcw size={14} /> : <Ban size={14} />}
@@ -1495,13 +1536,7 @@ export function AdminPage() {
                             .toggleUniversityActive(u.id, !u.is_active)
                             .then(() => Promise.all([loadAdminWorkspace(), refreshMetadata()]))
                             .then(() => toast.success("University status updated"))
-                            .catch((err) =>
-                              toast.error(
-                                err instanceof Error
-                                  ? err.message
-                                  : "Could not update university status",
-                              ),
-                            );
+                            .catch((err) => toast.error(toUserSafeErrorMessage(err)));
                         }}
                       >
                         {u.is_active ? "Disable" : "Enable"}
@@ -1614,11 +1649,7 @@ export function AdminPage() {
                               .toggleCategoryActive(c.id, !c.is_active)
                               .then(() => Promise.all([loadAdminWorkspace(), refreshMetadata()]))
                               .then(() => toast.success("Category updated"))
-                              .catch((err) =>
-                                toast.error(
-                                  err instanceof Error ? err.message : "Could not update category",
-                                ),
-                              );
+                              .catch((err) => toast.error(toUserSafeErrorMessage(err)));
                           }}
                         >
                           {c.is_active ? "Hide" : "Show"}
@@ -1833,13 +1864,7 @@ export function AdminPage() {
                               .togglePromotionConfig(promo.id, !promo.is_active)
                               .then(() => loadAdminWorkspace())
                               .then(() => toast.success("Promotion slot updated"))
-                              .catch((err) =>
-                                toast.error(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Could not update promotion slot",
-                                ),
-                              )
+                              .catch((err) => toast.error(toUserSafeErrorMessage(err)))
                           }
                         >
                           {promo.is_active ? "Disable" : "Enable"}
@@ -1967,6 +1992,223 @@ export function AdminPage() {
               Confirm role change
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Seller Identity Verification Review Dialog */}
+      <Dialog
+        open={Boolean(verifyTarget)}
+        onOpenChange={() => {
+          setVerifyTarget(null);
+          setVerifyDocUrl(null);
+          setConfirmAuthenticId(false);
+          setConfirmFaceMatch(false);
+        }}
+      >
+        <DialogContent className="mobile-dialog onboarding-dialog admin-verify-dialog">
+          <DialogTitle>Review seller identity — {verifyTarget?.full_name}</DialogTitle>
+          <DialogDescription>
+            {verifyTarget?.is_student ? "Student" : "Non-student"} ·{" "}
+            {verifyTarget?.id_document_type === "Voters ID"
+              ? "Voter's ID"
+              : verifyTarget?.id_document_type || "No ID uploaded yet"}
+            {verifyTarget?.verification_photo_confirmed
+              ? " · Seller confirmed photo matches ID"
+              : ""}
+          </DialogDescription>
+          {verifyTarget && (
+            <div className="modal-body">
+              <div className="admin-verify-compare">
+                <div className="admin-verify-pane">
+                  <small>Real Profile Photo</small>
+                  {isSafeMediaUrl(verifyTarget.profile_image) ? (
+                    <img
+                      src={verifyTarget.profile_image!}
+                      alt={`${verifyTarget.full_name} profile`}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="admin-verify-missing">No profile photo uploaded</div>
+                  )}
+                </div>
+                <div className="admin-verify-pane">
+                  <div className="flex items-center justify-between gap-2">
+                    <small>
+                      <CreditCard size={13} className="inline mr-1" />
+                      {verifyTarget.id_document_type === "Voters ID"
+                        ? "Voter's ID"
+                        : verifyTarget.id_document_type || "Submitted ID"}
+                    </small>
+                    {isSafeMediaUrl(verifyDocUrl) && (
+                      <a
+                        href={verifyDocUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-link text-xs inline-flex items-center gap-1"
+                      >
+                        Open full-size ID
+                        <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                  {verifyLoadingDoc ? (
+                    <div className="admin-verify-missing">Loading secure ID photo...</div>
+                  ) : isSafeMediaUrl(verifyDocUrl) ? (
+                    <img
+                      src={verifyDocUrl!}
+                      alt={`${verifyTarget.full_name} ID document`}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="admin-verify-missing">No ID image attached</div>
+                  )}
+                </div>
+              </div>
+
+              {verifyTarget.verification_checks && (
+                <div className="admin-verify-checks-box">
+                  <strong>Automated Image Pre-Checks</strong>
+                  <div className="admin-verify-checks-grid">
+                    <span>
+                      Expected ID:{" "}
+                      <b>
+                        {verifyTarget.verification_checks.documentType === "Voters ID"
+                          ? "Voter's ID"
+                          : verifyTarget.verification_checks.documentType}
+                      </b>
+                    </span>
+                    <span>
+                      Resolution: <b>{verifyTarget.verification_checks.resolution}</b> (
+                      {verifyTarget.verification_checks.format})
+                    </span>
+                    <span>
+                      Card framing:{" "}
+                      <b>
+                        {verifyTarget.verification_checks.cardFramingPassed ? "Passed" : "Flagged"}
+                      </b>
+                    </span>
+                    <span>
+                      Distinct from avatar:{" "}
+                      <b>
+                        {verifyTarget.verification_checks.distinctFromProfilePhoto
+                          ? "Passed"
+                          : "Duplicate detected"}
+                      </b>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {(!verifyTarget.id_document_path || !verifyTarget.profile_image) && (
+                <div className="verification-rejection-banner" role="alert">
+                  <Ban size={16} />
+                  <div>
+                    <strong>Cannot approve yet</strong>
+                    <p>
+                      This seller must upload both a valid{" "}
+                      {verifyTarget.is_student ? "Student ID" : "Ghana Card / Voter's ID"} and a
+                      real profile photo before an Admin can approve their shop.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {verifyTarget.id_document_path && verifyTarget.profile_image && (
+                <div className="admin-verify-checklist">
+                  <label className="audience-check">
+                    <input
+                      type="checkbox"
+                      checked={confirmAuthenticId}
+                      onChange={(e) => setConfirmAuthenticId(e.target.checked)}
+                    />
+                    <span>
+                      I inspected the ID image and confirm it is an authentic{" "}
+                      <strong>
+                        {verifyTarget.id_document_type === "Voters ID"
+                          ? "Voter's ID"
+                          : verifyTarget.id_document_type ||
+                            (verifyTarget.is_student ? "Student ID" : "Ghana Card / Voter's ID")}
+                      </strong>
+                      .
+                    </span>
+                  </label>
+                  <label className="audience-check">
+                    <input
+                      type="checkbox"
+                      checked={confirmFaceMatch}
+                      onChange={(e) => setConfirmFaceMatch(e.target.checked)}
+                    />
+                    <span>
+                      I compared both photos side by side and confirm the seller&apos;s profile
+                      photo shows the same person as the ID.
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div className="admin-quick-notes" role="group" aria-label="Quick rejection reasons">
+                {[
+                  "Wrong ID type (Students need Student ID; non-students need Ghana Card or Voter's ID).",
+                  "ID image is blurry or cropped — retake on a flat, well-lit surface.",
+                  "Real profile photo does not clearly match the face on the uploaded ID.",
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="admin-quick-note-btn"
+                    onClick={() => setVerifyRejectNote(preset)}
+                  >
+                    {preset.split(" — ")[0]?.split(" (")[0]}
+                  </button>
+                ))}
+              </div>
+
+              <label className="form-field">
+                <span>Rejection note (required if requesting new photos)</span>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Profile photo does not match the face on the Ghana Card, or ID text is blurry."
+                  value={verifyRejectNote}
+                  onChange={(e) => setVerifyRejectNote(e.target.value)}
+                />
+              </label>
+
+              <div className="form-bottom">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() =>
+                    void handleUserVerification(
+                      verifyTarget,
+                      "unverified",
+                      verifyRejectNote.trim() ||
+                        "Please upload a clearer ID and a matching real profile photo.",
+                    )
+                  }
+                >
+                  Request re-upload
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    !verifyTarget.id_document_path ||
+                    !verifyTarget.profile_image ||
+                    !confirmAuthenticId ||
+                    !confirmFaceMatch
+                  }
+                  onClick={() =>
+                    void handleUserVerification(
+                      verifyTarget,
+                      "verified",
+                      "ID validity & face match verified and approved by admin",
+                    )
+                  }
+                >
+                  <BadgeCheck size={15} />
+                  Approve seller
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Shell>
