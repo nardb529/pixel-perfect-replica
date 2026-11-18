@@ -21,9 +21,8 @@ export const Route = createFileRoute("/services")({
   }),
   head: () =>
     pageHead(
-      "Book Student Campus Services",
-      "Find verified photographers, graphic designers, tutors, hair stylists, and tech repair providers across Ghanaian campuses.",
-      { path: "/services" },
+      "Campus services",
+      "Discover photographers, designers, tutors and service providers serving university communities in Ghana.",
     ),
   component: Services,
 });

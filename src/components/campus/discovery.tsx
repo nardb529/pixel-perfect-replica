@@ -138,9 +138,9 @@ export function DiscoverPage() {
           <div>
             <p className="greeting">
               <span className="greeting-pulse" aria-hidden="true" />
-              Ghana University Campus Marketplace
+              Campus marketplace
             </p>
-            <h1>Buy, sell &amp; book across campus</h1>
+            <h1>What are you looking for today?</h1>
           </div>
           <span className="campus-scope-label">{university}</span>
         </div>

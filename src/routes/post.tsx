@@ -18,8 +18,7 @@ export const Route = createFileRoute("/post")({
   head: () =>
     pageHead(
       "Share a product or service",
-      "Create and publish a campus product or service listing on CampusLoop.",
-      { path: "/post", noIndex: true },
+      "Create and preview a campus product or service listing.",
     ),
   component: PostRoute,
 });

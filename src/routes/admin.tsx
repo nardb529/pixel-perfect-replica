@@ -12,7 +12,6 @@ export const Route = createFileRoute("/admin")({
     pageHead(
       "Community admin console",
       "Manage CampusLoop listings, sellers, reports, universities, categories, and announcements.",
-      { path: "/admin", noIndex: true },
     ),
   component: AdminRouteComponent,
 });

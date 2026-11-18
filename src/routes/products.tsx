@@ -21,9 +21,8 @@ export const Route = createFileRoute("/products")({
   }),
   head: () =>
     pageHead(
-      "Buy & Sell Campus Products",
-      "Shop laptops, phones, textbooks, fashion, food, and hostel essentials from verified student sellers across Ghanaian universities.",
-      { path: "/products" },
+      "Campus products",
+      "Find electronics, fashion, books and hostel essentials from your Ghanaian university community.",
     ),
   component: Products,
 });

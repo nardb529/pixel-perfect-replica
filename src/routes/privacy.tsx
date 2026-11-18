@@ -9,11 +9,7 @@ const PrivacyPage = lazy(() =>
 
 export const Route = createFileRoute("/privacy")({
   head: () =>
-    pageHead(
-      "Privacy Policy",
-      "Learn how CampusLoop protects buyer privacy and seller verification records across Ghana's campus marketplace.",
-      { path: "/privacy" },
-    ),
+    pageHead("Privacy Policy", "Learn how CampusLoop handles campus browsing and seller profiles."),
   component: PrivacyRouteComponent,
 });
 

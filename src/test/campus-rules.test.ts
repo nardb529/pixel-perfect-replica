@@ -7,10 +7,8 @@ import {
   validateListing,
   formatListingPrice,
   isSafeMediaUrl,
-  universities,
   type Listing,
 } from "@/lib/campus/data";
-import { pageHead, SITE_URL } from "@/lib/campus/meta";
 
 const fixtureListings: Listing[] = [
   {
@@ -168,37 +166,5 @@ describe("Campus marketplace rules", () => {
     expect(isSafeMediaUrl("data:image/svg+xml,<svg/>")).toBe(false);
     expect(isSafeMediaUrl("//evil.example.com/x.png")).toBe(false);
     expect(isSafeMediaUrl("")).toBe(false);
-  });
-
-  it("includes Central University among supported Ghanaian universities", () => {
-    expect(universities).toContain("Central University");
-    expect(universities).toContain("KNUST");
-    expect(universities).toContain("University of Ghana");
-  });
-
-  it("generates complete marketplace OpenGraph, Twitter, and canonical metadata", () => {
-    const publicHead = pageHead("Discover Campus Marketplace", "Shop student items across Ghana.", {
-      path: "/discover",
-    });
-    expect(publicHead.meta).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ title: "Discover Campus Marketplace | CampusLoop Marketplace" }),
-        expect.objectContaining({ property: "og:url", content: `${SITE_URL}/discover` }),
-        expect.objectContaining({ property: "og:image", content: `${SITE_URL}/og-image.jpg` }),
-        expect.objectContaining({ name: "twitter:card", content: "summary_large_image" }),
-      ]),
-    );
-    expect(publicHead.links).toEqual([{ rel: "canonical", href: `${SITE_URL}/discover` }]);
-
-    const privateHead = pageHead("Seller dashboard", "Manage listings.", {
-      path: "/dashboard",
-      noIndex: true,
-    });
-    expect(privateHead.meta).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "robots", content: "noindex, nofollow" }),
-      ]),
-    );
-    expect(privateHead.links).toEqual([]);
   });
 });

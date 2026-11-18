@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/listing._id_.edit-DAN_2vIM.js","assets/dialog-PYKqDZoF.js","assets/shared-CzJ1RUpm.js","assets/preload-helper-Czpn1I53.js"])))=>i.map(i=>d[i]);
-import{a as e,o as t,s as n}from"./meta-CafoC7Hm.js";import{t as r}from"./preload-helper-Czpn1I53.js";var i=n(`/listing/$id_/edit`)({head:()=>e(`Edit your campus listing`,`Update the details of your own CampusLoop product or service.`),component:t(()=>r(()=>import(`./listing._id_.edit-DAN_2vIM.js`),__vite__mapDeps([0,1,2,3])),`component`)});export{i as t};

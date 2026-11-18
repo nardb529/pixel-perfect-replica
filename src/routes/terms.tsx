@@ -9,11 +9,7 @@ const TermsPage = lazy(() =>
 
 export const Route = createFileRoute("/terms")({
   head: () =>
-    pageHead(
-      "Marketplace Rules & Terms",
-      "Community guidelines and safe campus meetup rules for buying and selling on CampusLoop Ghana.",
-      { path: "/terms" },
-    ),
+    pageHead("Terms of Use", "Community rules and safe trading guidelines for CampusLoop."),
   component: TermsRouteComponent,
 });
 

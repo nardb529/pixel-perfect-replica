@@ -253,7 +253,7 @@ export function ManualPage() {
               </li>
               <li>
                 Switch your campus anytime using the university selector in the top bar (KNUST, UG,
-                UCC, Central University, UPSA, UMaT, and more).
+                UCC, UPSA, UMaT, Ashesi, and more).
               </li>
               <li>
                 Tap the bookmark icon to save items or open any listing to message the seller via

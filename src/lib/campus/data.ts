@@ -17,150 +17,9 @@ export class UserInputError extends Error {
   }
 }
 
-type ErrorLike = {
-  message?: unknown;
-  code?: unknown;
-  status?: unknown;
-};
-
-function extractErrorDetails(err: unknown): {
-  message: string;
-  code: string;
-  status: number | null;
-} {
-  if (typeof err === "string") {
-    return { message: err, code: "", status: null };
-  }
-  if (err && typeof err === "object") {
-    const obj = err as ErrorLike;
-    return {
-      message: typeof obj.message === "string" ? obj.message : "",
-      code: typeof obj.code === "string" ? obj.code : "",
-      status: typeof obj.status === "number" ? obj.status : null,
-    };
-  }
-  return { message: "", code: "", status: null };
-}
-
-function matchUserActionableError(err: unknown): string | null {
-  const { message, code } = extractErrorDetails(err);
-  const msg = message.trim();
-  const lower = msg.toLowerCase();
-  const codeLower = code.trim().toLowerCase();
-
-  if (!lower && !codeLower) return null;
-
-  // Authentication & account errors the user can fix directly
-  if (
-    lower.includes("invalid login credentials") ||
-    lower.includes("invalid email or password") ||
-    codeLower === "invalid_credentials"
-  ) {
-    return "Incorrect email or password. Please check your details and try again.";
-  }
-
-  if (lower.includes("email not confirmed") || codeLower === "email_not_confirmed") {
-    return "Please verify your email address from the confirmation link in your inbox before signing in.";
-  }
-
-  if (
-    lower.includes("user already registered") ||
-    lower.includes("already been registered") ||
-    lower.includes("email already exists") ||
-    codeLower === "user_already_exists" ||
-    codeLower === "email_exists"
-  ) {
-    return "An account with this email already exists. Switch to Log In instead.";
-  }
-
-  if (
-    lower.includes("new password should be different") ||
-    lower.includes("same_password") ||
-    codeLower === "same_password"
-  ) {
-    return "Choose a new password that is different from your current password.";
-  }
-
-  if (
-    lower.includes("password should be at least") ||
-    lower.includes("password is too weak") ||
-    codeLower === "weak_password"
-  ) {
-    return "Use a stronger password with at least 8 characters.";
-  }
-
-  if (
-    lower.includes("for security purposes, you can only request this after") ||
-    lower.includes("email rate limit exceeded") ||
-    lower.includes("rate limit") ||
-    lower.includes("too many requests") ||
-    codeLower === "over_email_send_rate_limit" ||
-    codeLower === "over_request_rate_limit"
-  ) {
-    const waitMatch = lower.match(/after\s+(\d+)\s*seconds?/);
-    if (waitMatch?.[1]) {
-      return `Too many attempts. Please wait ${waitMatch[1]} seconds before trying again.`;
-    }
-    return "Too many attempts. Please wait a moment before trying again.";
-  }
-
-  if (
-    lower.includes("unable to validate email address") ||
-    lower.includes("invalid format") ||
-    codeLower === "email_address_invalid"
-  ) {
-    return "Enter a valid email address.";
-  }
-
-  if (
-    lower.includes("token has expired") ||
-    lower.includes("otp expired") ||
-    lower.includes("auth session missing") ||
-    codeLower === "otp_expired"
-  ) {
-    return "This verification or reset link has expired or already been used. Request a fresh link to continue.";
-  }
-
-  if (lower.includes("user not found") || codeLower === "user_not_found") {
-    return "No account found with that email address.";
-  }
-
-  if (
-    lower.includes("user is banned") ||
-    lower.includes("account suspended") ||
-    codeLower === "user_banned"
-  ) {
-    return "This account has been suspended. Contact support for assistance.";
-  }
-
-  if (lower.includes("signups not allowed") || codeLower === "signup_disabled") {
-    return "New seller registrations are temporarily paused. Please try again later.";
-  }
-
-  // Unique constraint errors caused by user-chosen values
-  if (codeLower === "23505" || lower.includes("duplicate key value")) {
-    if (lower.includes("username")) {
-      return "That username is already taken. Try choosing a different username.";
-    }
-    if (lower.includes("email")) {
-      return "An account with this email already exists. Try logging in instead.";
-    }
-  }
-
-  if (lower === "authentication required" || lower.startsWith("sign in to ")) {
-    return msg.endsWith(".") ? msg : `${msg}.`;
-  }
-
-  return null;
-}
-
 export function toUserSafeErrorMessage(err: unknown): string {
   if (err instanceof UserInputError && err.message.trim()) {
     return err.message;
-  }
-  const actionable = matchUserActionableError(err);
-  if (actionable) {
-    return actionable;
   }
   if (err !== undefined && err !== null) {
     console.error("[CampusLoop handled error]", err);
@@ -184,7 +43,6 @@ export const universities = [
   "ATU",
   "KsTU",
   "TTU",
-  "Central University",
   "Other institutions",
 ];
 

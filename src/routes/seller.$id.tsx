@@ -10,9 +10,8 @@ const ProfilePage = lazy(() =>
 export const Route = createFileRoute("/seller/$id")({
   head: () =>
     pageHead(
-      "Verified Seller Shopfront",
-      "Browse all campus products and student services offered by this seller across Ghanaian universities on CampusLoop.",
-      { path: "/seller" },
+      "Seller shop storefront",
+      "Browse all campus products and services provided by this verified seller.",
     ),
   component: Seller,
 });
