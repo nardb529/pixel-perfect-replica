@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { UserInputError } from "@/lib/campus/data";
 
 const supabaseUrl =
   typeof import.meta !== "undefined" && import.meta.env
@@ -134,4 +135,28 @@ export async function compressImageFile(
   } catch {
     return file;
   }
+}
+
+/** Phone cameras often produce 6-12 MB photos, so accept big originals and shrink them before upload. */
+export const MAX_RAW_IMAGE_BYTES = 25 * 1024 * 1024;
+export const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export async function prepareImageForUpload(
+  file: File,
+  maxDimension = 1400,
+  quality = 0.84,
+): Promise<File> {
+  if (file.size > MAX_RAW_IMAGE_BYTES) {
+    throw new UserInputError("That photo is larger than 25 MB. Choose a smaller photo.");
+  }
+  let output = await compressImageFile(file, maxDimension, quality);
+  if (output.size > MAX_UPLOAD_IMAGE_BYTES) {
+    output = await compressImageFile(output, Math.round(maxDimension * 0.7), 0.7);
+  }
+  if (output.size > MAX_UPLOAD_IMAGE_BYTES) {
+    throw new UserInputError(
+      "This photo is still over 5 MB after shrinking. Take a new photo or choose a smaller one.",
+    );
+  }
+  return output;
 }
