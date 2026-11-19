@@ -24,6 +24,68 @@ const VALID_NOTIFICATION_TYPES = new Set<NotificationKind>([
   "listing_approved",
 ]);
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// PostgREST returns at most 1000 rows per request, so read recipients page by page.
+async function collectProfileIds(
+  adminClient: import("@supabase/supabase-js").SupabaseClient,
+  filters: { verifiedOnly?: boolean; universityId?: string },
+): Promise<string[]> {
+  const ids = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let query = adminClient
+      .from("profiles")
+      .select("id")
+      .eq("is_suspended", false)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (filters.verifiedOnly) query = query.eq("verification_status", "verified");
+    if (filters.universityId) query = query.eq("primary_university_id", filters.universityId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const rows = data || [];
+    for (const row of rows) ids.add(String(row.id));
+    if (rows.length < pageSize) break;
+  }
+  return Array.from(ids);
+}
+
+async function collectUniversityMemberIds(
+  adminClient: import("@supabase/supabase-js").SupabaseClient,
+  universityId: string,
+): Promise<string[]> {
+  const ids = new Set<string>(await collectProfileIds(adminClient, { universityId }));
+  const pageSize = 1000;
+  const affiliated: string[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await adminClient
+      .from("user_universities")
+      .select("user_id")
+      .eq("university_id", universityId)
+      .order("user_id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    for (const row of rows) affiliated.push(String(row.user_id));
+    if (rows.length < pageSize) break;
+  }
+  for (const part of chunk(affiliated, 100)) {
+    const { data, error } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("is_suspended", false)
+      .in("id", part);
+    if (error) throw error;
+    for (const row of data || []) ids.add(String(row.id));
+  }
+  return Array.from(ids);
+}
+
 export const Route = createFileRoute("/api/push/send")({
   server: {
     handlers: {
@@ -92,43 +154,38 @@ export const Route = createFileRoute("/api/push/send")({
           typeof payload.audience === "string" ? (payload.audience as AudienceScope) : undefined;
         let targetUserIds: string[] = [];
 
-        if (audience === "all") {
-          const { data, error } = await adminClient
-            .from("profiles")
-            .select("id")
-            .eq("is_suspended", false);
-          if (error) return jsonResponse({ error: "Failed to resolve recipients." }, 500);
-          targetUserIds = (data || []).map((r) => String(r.id));
-        } else if (audience === "verified") {
-          const { data, error } = await adminClient
-            .from("profiles")
-            .select("id")
-            .eq("is_suspended", false)
-            .eq("verification_status", "verified");
-          if (error) return jsonResponse({ error: "Failed to resolve verified recipients." }, 500);
-          targetUserIds = (data || []).map((r) => String(r.id));
-        } else if (audience === "university") {
-          const uniId = typeof payload.universityId === "string" ? payload.universityId.trim() : "";
-          if (!uniId) {
-            return jsonResponse(
-              { error: "University ID is required for university audience." },
-              400,
-            );
+        try {
+          if (audience === "all") {
+            targetUserIds = await collectProfileIds(adminClient, {});
+          } else if (audience === "verified") {
+            targetUserIds = await collectProfileIds(adminClient, { verifiedOnly: true });
+          } else if (audience === "university") {
+            const uniId =
+              typeof payload.universityId === "string" ? payload.universityId.trim() : "";
+            if (!uniId) {
+              return jsonResponse(
+                { error: "University ID is required for university audience." },
+                400,
+              );
+            }
+            targetUserIds = await collectUniversityMemberIds(adminClient, uniId);
           }
-          const { data, error } = await adminClient
-            .from("profiles")
-            .select("id")
-            .eq("is_suspended", false)
-            .eq("primary_university_id", uniId);
-          if (error) return jsonResponse({ error: "Failed to resolve campus recipients." }, 500);
-          targetUserIds = (data || []).map((r) => String(r.id));
-        } else if (audience === "single") {
+        } catch {
+          return jsonResponse({ error: "Failed to resolve recipients." }, 500);
+        }
+
+        if (audience === "single") {
           const singleId = typeof payload.userId === "string" ? payload.userId.trim() : "";
           if (!singleId) {
             return jsonResponse({ error: "User ID is required for single user audience." }, 400);
           }
           targetUserIds = [singleId];
-        } else if (Array.isArray(payload.userIds)) {
+        } else if (
+          audience !== "all" &&
+          audience !== "verified" &&
+          audience !== "university" &&
+          Array.isArray(payload.userIds)
+        ) {
           targetUserIds = Array.from(
             new Set(
               payload.userIds
@@ -161,19 +218,31 @@ export const Route = createFileRoute("/api/push/send")({
             notification_type: notificationType,
             metadata: { scope: scopeLabel, url },
           }));
-          const { error: notifErr } = await adminClient.from("notifications").insert(inAppRows);
-          if (notifErr) {
-            return jsonResponse({ error: "Failed to create in-app notifications." }, 500);
+          for (const part of chunk(inAppRows, 500)) {
+            const { error: notifErr } = await adminClient.from("notifications").insert(part);
+            if (notifErr) {
+              return jsonResponse({ error: "Failed to create in-app notifications." }, 500);
+            }
           }
         }
 
-        const { data: subs, error: subsErr } = await adminClient
-          .from("push_subscriptions")
-          .select("id, endpoint, p256dh, auth")
-          .in("user_id", targetUserIds);
-
-        if (subsErr) {
-          return jsonResponse({ error: "Failed to query device subscriptions." }, 500);
+        const subs: Array<{ id: string; endpoint: string; p256dh: string; auth: string }> = [];
+        for (const part of chunk(targetUserIds, 100)) {
+          const { data: subRows, error: subsErr } = await adminClient
+            .from("push_subscriptions")
+            .select("id, endpoint, p256dh, auth")
+            .in("user_id", part);
+          if (subsErr) {
+            return jsonResponse({ error: "Failed to query device subscriptions." }, 500);
+          }
+          for (const row of subRows || []) {
+            subs.push({
+              id: String(row.id),
+              endpoint: String(row.endpoint),
+              p256dh: String(row.p256dh),
+              auth: String(row.auth),
+            });
+          }
         }
 
         const vapid = configureVapid();
@@ -189,7 +258,7 @@ export const Route = createFileRoute("/api/push/send")({
           });
         }
 
-        if (!subs || subs.length === 0) {
+        if (subs.length === 0) {
           return jsonResponse({
             ok: true,
             recipientCount: targetUserIds.length,
@@ -215,35 +284,39 @@ export const Route = createFileRoute("/api/push/send")({
         let failedDevices = 0;
         const expiredIds: string[] = [];
 
-        await Promise.all(
-          subs.map(async (sub) => {
-            try {
-              await sendNotification(
-                {
-                  endpoint: sub.endpoint,
-                  keys: {
-                    p256dh: sub.p256dh,
-                    auth: sub.auth,
+        for (const batch of chunk(subs, 50)) {
+          await Promise.all(
+            batch.map(async (sub) => {
+              try {
+                await sendNotification(
+                  {
+                    endpoint: sub.endpoint,
+                    keys: {
+                      p256dh: sub.p256dh,
+                      auth: sub.auth,
+                    },
                   },
-                },
-                pushBody,
-              );
-              deliveredDevices += 1;
-            } catch (pushErr: unknown) {
-              failedDevices += 1;
-              const statusCode =
-                pushErr && typeof pushErr === "object" && "statusCode" in pushErr
-                  ? Number((pushErr as { statusCode?: number }).statusCode)
-                  : 0;
-              if (statusCode === 404 || statusCode === 410) {
-                expiredIds.push(String(sub.id));
+                  pushBody,
+                );
+                deliveredDevices += 1;
+              } catch (pushErr: unknown) {
+                failedDevices += 1;
+                const statusCode =
+                  pushErr && typeof pushErr === "object" && "statusCode" in pushErr
+                    ? Number((pushErr as { statusCode?: number }).statusCode)
+                    : 0;
+                if (statusCode === 404 || statusCode === 410) {
+                  expiredIds.push(String(sub.id));
+                }
               }
-            }
-          }),
-        );
+            }),
+          );
+        }
 
         if (expiredIds.length > 0) {
-          await adminClient.from("push_subscriptions").delete().in("id", expiredIds);
+          for (const part of chunk(expiredIds, 100)) {
+            await adminClient.from("push_subscriptions").delete().in("id", part);
+          }
         }
 
         await adminClient.from("moderation_logs").insert({
