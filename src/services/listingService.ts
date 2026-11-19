@@ -1,5 +1,5 @@
 import {
-  compressImageFile,
+  prepareImageForUpload,
   getSessionUser,
   getSupabaseClient,
   requireSupabase,
@@ -474,14 +474,10 @@ export const listingService = {
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
       throw new UserInputError("Only JPG, PNG, WebP or AVIF images are allowed.");
     }
-    if (file.size > 5 * 1024 * 1024) {
-      throw new UserInputError("Images must be 5 MB or smaller.");
-    }
-
     const user = await getSessionUser(supabase);
     if (!user) throw new Error("Sign in to upload images.");
 
-    const optimized = await compressImageFile(file, 1400, 0.84);
+    const optimized = await prepareImageForUpload(file, 1400, 0.84);
     const mimeToExt: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/png": "png",
