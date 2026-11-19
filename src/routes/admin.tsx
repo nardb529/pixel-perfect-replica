@@ -4,7 +4,7 @@ import { PagePendingFallback } from "@/components/campus/shared";
 import { pageHead } from "@/lib/campus/meta";
 
 const AdminPage = lazy(() =>
-  import("@/components/campus/admin").then((m) => ({ default: m.AdminPage })),
+  import("@/components/campus/adminConsole").then((m) => ({ default: m.AdminPage })),
 );
 
 export const Route = createFileRoute("/admin")({

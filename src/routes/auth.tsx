@@ -4,7 +4,7 @@ import { PagePendingFallback } from "@/components/campus/shared";
 import { pageHead } from "@/lib/campus/meta";
 
 const AuthPage = lazy(() =>
-  import("@/components/campus/auth").then((m) => ({ default: m.AuthPage })),
+  import("@/components/campus/authPage").then((m) => ({ default: m.AuthPage })),
 );
 
 export const Route = createFileRoute("/auth")({
