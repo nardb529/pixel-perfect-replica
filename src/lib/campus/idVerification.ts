@@ -15,6 +15,15 @@ export interface ImageValidityResult {
   summary: string;
 }
 
+export interface LiveSelfieChecks {
+  method: "live_selfie";
+  challenges: string[];
+  livenessPassedAt: string;
+  width: number;
+  height: number;
+  sizeKb: number;
+}
+
 export interface VerificationChecksPayload {
   documentType: IdDocumentType;
   isStudent: boolean;
