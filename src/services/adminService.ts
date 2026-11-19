@@ -197,11 +197,33 @@ export const adminService = {
   ): Promise<void> {
     const supabase = requireSupabase();
     const cleanNote = note?.trim().slice(0, 500) || null;
+
+    // When a resubmission is requested, delete the stored selfie (privacy) and clear its path.
+    let clearSelfie = false;
+    if (status === "unverified") {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id_document_path, id_document_type")
+        .eq("id", userId)
+        .maybeSingle();
+      const existingPath = existing?.id_document_path as string | null | undefined;
+      if (existingPath && existing?.id_document_type === "Live Selfie") {
+        await supabase.storage
+          .from("seller-verifications")
+          .remove([existingPath])
+          .catch(() => undefined);
+        clearSelfie = true;
+      }
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
         verification_status: status,
         verification_note: status === "verified" ? null : cleanNote,
+        ...(clearSelfie
+          ? { id_document_path: null, id_document_type: null, verification_photo_confirmed: false }
+          : {}),
       })
       .eq("id", userId);
     if (error) throw error;
