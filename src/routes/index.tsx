@@ -12,6 +12,7 @@ export const Route = createFileRoute("/")({
     pageHead(
       "Ghana University Campus Marketplace",
       "Buy and sell student products and campus services across KNUST, UG, UCC, UDS, UENR, and every university in Ghana. Buyers need no account.",
+      { path: "/" },
     ),
   component: Welcome,
 });
