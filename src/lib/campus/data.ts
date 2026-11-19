@@ -102,6 +102,29 @@ export function toUserSafeErrorMessage(err: unknown): string {
     if (normalized.includes("listing_image_limit_reached")) {
       return "You have reached the maximum number of photos allowed per listing on your plan.";
     }
+    if (
+      normalized.includes("row-level security") ||
+      normalized.includes("violates row-level") ||
+      rawCode === "42501"
+    ) {
+      return "Your account is not allowed to do that yet. If you are publishing, finish seller verification first. If you are uploading a photo, sign out and back in, then try again.";
+    }
+    if (normalized.includes("bucket not found")) {
+      return "Photo storage is not switched on yet. Please contact CampusLoop support so it can be fixed.";
+    }
+    if (
+      normalized.includes("exceeded the maximum allowed size") ||
+      normalized.includes("payload too large")
+    ) {
+      return "That photo is too large. Choose a smaller photo and try again.";
+    }
+    if (
+      normalized.includes("mime type") ||
+      normalized.includes("invalid mime") ||
+      normalized.includes("not supported")
+    ) {
+      return "That photo format is not supported. Use a JPG, PNG or WebP photo.";
+    }
     if (normalized.includes("auth session missing")) {
       return "Your session expired. Please sign in again to continue.";
     }
