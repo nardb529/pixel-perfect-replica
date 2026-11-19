@@ -48,8 +48,8 @@ vi.mock("@tanstack/react-router", async () => {
   };
 });
 
-import { AdminPage } from "@/components/campus/admin";
-import { AuthPage } from "@/components/campus/auth";
+import { AdminPage } from "@/components/campus/adminConsole";
+import { AuthPage } from "@/components/campus/authPage";
 import { DiscoverPage } from "@/components/campus/discovery";
 import { ProfilePage } from "@/components/campus/profiles";
 import {
