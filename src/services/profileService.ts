@@ -1,5 +1,5 @@
 import {
-  compressImageFile,
+  prepareImageForUpload,
   getSessionUser,
   getSupabaseClient,
   isSchemaMissingError,
@@ -184,10 +184,6 @@ export const profileService = {
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
       throw new UserInputError("Choose a JPG, PNG, or WebP image file.");
     }
-    if (file.size > 5 * 1024 * 1024) {
-      throw new UserInputError("Profile images must be 5 MB or smaller.");
-    }
-
     const validity = await inspectVerificationImage(file, "profile");
     if (!validity.valid) {
       throw new UserInputError(validity.reason || "Profile photo failed image quality checks.");
@@ -196,7 +192,7 @@ export const profileService = {
     const user = await getSessionUser(supabase);
     if (!user) throw new Error("Authentication required");
 
-    const optimized = await compressImageFile(file, 720, 0.85);
+    const optimized = await prepareImageForUpload(file, 720, 0.85);
     const mimeToExt: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/png": "png",
@@ -228,10 +224,6 @@ export const profileService = {
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
       throw new UserInputError("Upload a clear JPG, PNG, or WebP photo of your ID card.");
     }
-    if (file.size > 5 * 1024 * 1024) {
-      throw new UserInputError("ID document image must be 5 MB or smaller.");
-    }
-
     const validity = await inspectVerificationImage(file, "id", expectedDocType);
     if (!validity.valid) {
       throw new UserInputError(
@@ -242,7 +234,7 @@ export const profileService = {
     const user = await getSessionUser(supabase);
     if (!user) throw new Error("Sign in to upload verification documents.");
 
-    const optimized = await compressImageFile(file, 1400, 0.88);
+    const optimized = await prepareImageForUpload(file, 1400, 0.88);
     const mimeToExt: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/png": "png",
