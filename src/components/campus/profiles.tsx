@@ -47,6 +47,7 @@ import {
   toUserSafeErrorMessage,
   type Listing,
 } from "@/lib/campus/data";
+import { describePushFailure, getPushNotificationState } from "@/lib/campus/push";
 import { listingService, profileService } from "@/services";
 import type { PublicSellerProfileRecord } from "@/lib/supabase/database.types";
 import { SellerStatusIndicator } from "./verification";
@@ -280,7 +281,11 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     try {
       const permission = await requestAppNotifications();
       if (permission === "granted") {
-        toast.success("Notifications turned on for this device");
+        if ((await getPushNotificationState()) === "on") {
+          toast.success("Notifications turned on for this device");
+        } else {
+          toast.error(describePushFailure());
+        }
       } else if (permission === "denied") {
         toast.info("Notifications are blocked in your browser settings");
       } else if (permission === "unsupported") {
