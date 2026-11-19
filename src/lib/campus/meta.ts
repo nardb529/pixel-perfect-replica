@@ -1,6 +1,9 @@
 import { BRAND } from "./data";
 
-export const DEFAULT_SITE_URL = "https://pixel-perfect-replica-five-psi.vercel.app";
+export const DEFAULT_SITE_URL = "https://campusloop-gh.vercel.app";
+
+// Older deployments used this address. Never let a stale setting point links or previews at it.
+const STALE_SITE_HOSTS = ["pixel-perfect-replica-five-psi.vercel.app"];
 export const SITE_URL = DEFAULT_SITE_URL;
 
 export function getCanonicalSiteUrl(): string {
@@ -8,7 +11,7 @@ export function getCanonicalSiteUrl(): string {
     typeof import.meta !== "undefined" && import.meta.env?.["VITE_SITE_URL"]
       ? String(import.meta.env["VITE_SITE_URL"]).trim()
       : "";
-  if (configured) {
+  if (configured && !STALE_SITE_HOSTS.some((host) => configured.includes(host))) {
     return configured.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined" && window.location?.origin) {
@@ -157,6 +160,8 @@ export const pageHead = (
       { property: "og:type", content: options?.type || "website" },
       ...(canonicalUrl ? [{ property: "og:url", content: canonicalUrl }] : []),
       { property: "og:image", content: imageUrl },
+      { property: "og:image:secure_url", content: imageUrl },
+      { property: "og:image:type", content: "image/jpeg" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: imageAlt },
