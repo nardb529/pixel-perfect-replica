@@ -11,10 +11,13 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 const isVercel = Boolean(process.env["VERCEL"] || process.env["VERCEL_ENV"]);
 
+const nitroConfig = {
+  preset: isVercel ? "vercel" : "node-server",
+  inlineDynamicImports: isVercel,
+} as { preset: string };
+
 export default defineConfig({
-  nitro: {
-    preset: isVercel ? "vercel" : "node-server",
-  },
+  nitro: nitroConfig,
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

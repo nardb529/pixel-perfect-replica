@@ -1,6 +1,7 @@
 import { BRAND } from "./data";
 
 export const DEFAULT_SITE_URL = "https://pixel-perfect-replica-five-psi.vercel.app";
+export const SITE_URL = DEFAULT_SITE_URL;
 
 export function getCanonicalSiteUrl(): string {
   const configured =
@@ -26,12 +27,21 @@ export const pageHead = (
   title: string,
   description: string,
   options?: {
+    path?: string;
     imagePath?: string;
     imageAlt?: string;
     type?: "website" | "profile";
+    noIndex?: boolean;
   },
 ) => {
   const fullTitle = `${title} · ${BRAND} Campus Marketplace`;
+  const canonicalBase = getCanonicalSiteUrl();
+  const normalizedPath = options?.path
+    ? options.path.startsWith("/")
+      ? options.path
+      : `/${options.path}`
+    : undefined;
+  const canonicalUrl = normalizedPath ? `${canonicalBase}${normalizedPath}` : undefined;
   const imageUrl = resolveAbsoluteOgImage(options?.imagePath || "/og-marketplace.jpg");
   const imageAlt =
     options?.imageAlt ||
@@ -41,10 +51,12 @@ export const pageHead = (
     meta: [
       { title: fullTitle },
       { name: "description", content: description },
+      ...(options?.noIndex ? [{ name: "robots", content: "noindex, nofollow" }] : []),
       { property: "og:site_name", content: `${BRAND} Marketplace` },
       { property: "og:title", content: fullTitle },
       { property: "og:description", content: description },
       { property: "og:type", content: options?.type || "website" },
+      ...(canonicalUrl ? [{ property: "og:url", content: canonicalUrl }] : []),
       { property: "og:image", content: imageUrl },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
@@ -54,5 +66,6 @@ export const pageHead = (
       { name: "twitter:description", content: description },
       { name: "twitter:image", content: imageUrl },
     ],
+    links: canonicalUrl && !options?.noIndex ? [{ rel: "canonical", href: canonicalUrl }] : [],
   };
 };

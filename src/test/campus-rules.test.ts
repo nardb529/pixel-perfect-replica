@@ -170,8 +170,8 @@ describe("Campus marketplace rules", () => {
     expect(isSafeMediaUrl("")).toBe(false);
   });
 
-  it("includes Central University among supported Ghanaian universities", () => {
-    expect(universities).toContain("Central University");
+  it("includes Other institutions among supported Ghanaian universities", () => {
+    expect(universities).toContain("Other institutions");
     expect(universities).toContain("KNUST");
     expect(universities).toContain("University of Ghana");
   });
@@ -182,9 +182,14 @@ describe("Campus marketplace rules", () => {
     });
     expect(publicHead.meta).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ title: "Discover Campus Marketplace | CampusLoop Marketplace" }),
+        expect.objectContaining({
+          title: "Discover Campus Marketplace · CampusLoop Campus Marketplace",
+        }),
         expect.objectContaining({ property: "og:url", content: `${SITE_URL}/discover` }),
-        expect.objectContaining({ property: "og:image", content: `${SITE_URL}/og-image.jpg` }),
+        expect.objectContaining({
+          property: "og:image",
+          content: `${SITE_URL}/og-marketplace.jpg`,
+        }),
         expect.objectContaining({ name: "twitter:card", content: "summary_large_image" }),
       ]),
     );
