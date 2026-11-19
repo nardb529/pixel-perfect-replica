@@ -115,6 +115,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         property: "og:image",
         content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
       },
+      { property: "og:url", content: DEFAULT_SITE_URL },
+      { property: "og:image:secure_url", content: `${DEFAULT_SITE_URL}/og-marketplace.jpg` },
+      { property: "og:image:type", content: "image/jpeg" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       {
