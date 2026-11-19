@@ -209,13 +209,13 @@ export const adminService = {
     await writeAuditLog(`user_verification_${status}`, "profile", userId, cleanNote ?? undefined);
     const title =
       status === "verified"
-        ? "Seller account verified"
+        ? "🎉 Congratulations, you're verified!"
         : status === "pending"
           ? "Verification under review"
           : "Seller verification needs an update";
     const message =
       status === "verified"
-        ? "Your CampusLoop seller verification is approved. You can now post products and services."
+        ? "Your CampusLoop seller account has been approved. You can now post your products and services. Tap to start selling!"
         : cleanNote || `Your seller verification status was updated to ${status}.`;
     const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
@@ -238,7 +238,7 @@ export const adminService = {
           userIds: [userId],
           title,
           message,
-          url: "/dashboard",
+          url: status === "verified" ? "/post" : "/dashboard",
           skipInAppInsert: true,
         }),
       }).catch(() => undefined);
