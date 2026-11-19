@@ -91,7 +91,38 @@ export async function showDeviceNotification(input: {
   }
 }
 
+let lastPushFailureReason = "";
+
+export function describePushFailure(reason = lastPushFailureReason): string {
+  switch (reason) {
+    case "missing_vapid_key":
+      return "Notifications are not set up yet (missing VITE_VAPID_PUBLIC_KEY). Tell the admin.";
+    case "service_worker_unavailable":
+      return "The app is still loading. Close it, reopen, and try again.";
+    case "unauthenticated":
+      return "Please sign in again, then turn on notifications.";
+    case "subscribe_failed":
+    case "subscription_error":
+      return "This device could not be registered for notifications. Try again or use another browser.";
+    default:
+      return "Could not turn on notifications. Please try again.";
+  }
+}
+
+export function getLastPushFailureReason(): string {
+  return lastPushFailureReason;
+}
+
 export async function syncPushSubscriptionForCurrentUser(): Promise<{
+  subscribed: boolean;
+  reason?: string;
+}> {
+  const result = await syncPushSubscriptionInner();
+  lastPushFailureReason = result.subscribed ? "" : result.reason || "";
+  return result;
+}
+
+async function syncPushSubscriptionInner(): Promise<{
   subscribed: boolean;
   reason?: string;
 }> {
