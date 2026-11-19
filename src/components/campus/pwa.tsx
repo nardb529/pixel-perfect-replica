@@ -429,3 +429,145 @@ export function OfflineBanner() {
     </div>
   );
 }
+
+const BOT_PATTERN =
+  /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|preview|lighthouse/i;
+const IN_APP_BROWSER_PATTERN = /FBAN|FBAV|Instagram|Snapchat|TikTok|Line\/|MicroMessenger|; wv\)/i;
+
+/**
+ * Phones only: if the site is opened in a normal browser tab (not from the
+ * Home Screen icon), block the app behind an "Install to continue" screen.
+ * Search engine bots, link-preview bots, desktops, tablets-as-desktop and the
+ * admin area are never blocked.
+ */
+export function InstallGate() {
+  const { isIOS, canNativeInstall, triggerNativeInstall } = useCampus();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [blocked, setBlocked] = useState(false);
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [installing, setInstalling] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = navigator.userAgent || "";
+    const isPhone = /iPhone|iPod|Android.+Mobile|Mobile.+Android/i.test(ua);
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    setInAppBrowser(IN_APP_BROWSER_PATTERN.test(ua));
+    setBlocked(isPhone && !standalone && !BOT_PATTERN.test(ua));
+
+    const onInstalled = () => setBlocked(false);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, []);
+
+  if (!blocked || pathname.startsWith("/admin")) return null;
+
+  async function handleInstall() {
+    if (!canNativeInstall) return;
+    setInstalling(true);
+    const outcome = await triggerNativeInstall();
+    setInstalling(false);
+    if (outcome === "accepted") {
+      toast.success(`${BRAND} added to your device`);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Install ${BRAND}`}
+      className="fixed inset-0 z-[2147483000] flex items-center justify-center overflow-y-auto bg-background p-6"
+    >
+      <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
+        <img
+          src="/pwa-192x192.png"
+          alt={`${BRAND} app icon`}
+          width={84}
+          height={84}
+          className="rounded-2xl shadow-lg"
+        />
+        <h1 className="text-2xl font-bold">Install {BRAND} to continue</h1>
+        <p className="text-sm text-muted-foreground">
+          {BRAND} works as an app on your phone. Add it to your Home Screen, then open it from the
+          icon. It is free and takes 10 seconds.
+        </p>
+
+        {inAppBrowser ? (
+          <div className="install-steps-box w-full text-left">
+            <div className="install-step">
+              <span className="step-num">1</span>
+              <p>
+                You are inside another app's browser. Tap the <strong>⋯</strong> or Share menu and
+                choose <strong>Open in {isIOS ? "Safari" : "Chrome"}</strong>.
+              </p>
+            </div>
+            <div className="install-step">
+              <span className="step-num">2</span>
+              <p>Then {isIOS ? "tap Share, then Add to Home Screen" : "tap Install app"}.</p>
+            </div>
+          </div>
+        ) : isIOS ? (
+          <div className="install-steps-box w-full text-left">
+            <div className="install-step">
+              <span className="step-num">1</span>
+              <p>
+                Tap <Share size={14} className="inline-icon" /> <strong>Share</strong> at the bottom
+                of Safari
+              </p>
+            </div>
+            <div className="install-step">
+              <span className="step-num">2</span>
+              <p>
+                Choose <PlusSquare size={14} className="inline-icon" />{" "}
+                <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
+              </p>
+            </div>
+            <div className="install-step">
+              <span className="step-num">3</span>
+              <p>
+                Open <strong>{BRAND}</strong> from your Home Screen
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {canNativeInstall ? (
+              <Button
+                className="onboarding-cta w-full"
+                onClick={handleInstall}
+                disabled={installing}
+              >
+                <Download size={17} />
+                <span>{installing ? "Opening installer..." : "Install app"}</span>
+              </Button>
+            ) : (
+              <div className="install-steps-box w-full text-left">
+                <div className="install-step">
+                  <span className="step-num">1</span>
+                  <p>
+                    Open your browser menu (<strong>⋮</strong>) in Chrome
+                  </p>
+                </div>
+                <div className="install-step">
+                  <span className="step-num">2</span>
+                  <p>
+                    Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Already installed? Open {BRAND} from its icon on your Home Screen.
+        </p>
+      </div>
+    </div>
+  );
+}
