@@ -72,11 +72,11 @@ export async function verifyImageBinarySignature(
       reason: "Image file is too small or corrupted. Upload a full-quality photo.",
     };
   }
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > 25 * 1024 * 1024) {
     return {
       valid: false,
       format: "Unknown",
-      reason: "Image must be 5 MB or smaller.",
+      reason: "Photo is larger than 25 MB. Choose a smaller photo.",
     };
   }
 
