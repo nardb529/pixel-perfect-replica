@@ -9,6 +9,7 @@ import { UserInputError } from "@/lib/campus/data";
 import {
   inspectVerificationImage,
   type ImageValidityResult,
+  type LiveSelfieChecks,
   type VerificationChecksPayload,
 } from "@/lib/campus/idVerification";
 import type {
@@ -337,6 +338,48 @@ export const profileService = {
       }
       throw error;
     }
+    return data as ProfileRecord;
+  },
+  /**
+   * Live-selfie verification. Stores ONE small private photo in the
+   * seller-verifications bucket (same path each time, so retakes replace the old
+   * file) and moves the account to "pending". Only an admin can approve.
+   */
+  async submitLiveSelfieVerification(blob: Blob, checks: LiveSelfieChecks): Promise<ProfileRecord> {
+    if (!blob || blob.size === 0) {
+      throw new UserInputError("Take a live selfie first.");
+    }
+    if (blob.size > 400 * 1024) {
+      throw new UserInputError("The selfie is too large. Please retake it in better light.");
+    }
+    const supabase = requireSupabase();
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
+
+    const path = `${user.id}/selfie.jpg`;
+    const { error: uploadErr } = await supabase.storage
+      .from("seller-verifications")
+      .upload(path, blob, {
+        upsert: true,
+        contentType: "image/jpeg",
+        cacheControl: "60",
+      });
+    if (uploadErr) throw uploadErr;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({
+        id_document_type: "Live Selfie",
+        id_document_path: path,
+        verification_photo_confirmed: true,
+        verification_submitted_at: new Date().toISOString(),
+        verification_checks: checks,
+        verification_status: "pending" as const,
+      })
+      .eq("id", user.id)
+      .select(PROFILE_COLUMNS)
+      .single();
+    if (error) throw error;
     return data as ProfileRecord;
   },
 };
