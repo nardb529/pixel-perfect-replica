@@ -1,8 +1,8 @@
-import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
+import type { LiveSelfieChecks, VerificationChecksPayload } from "@/lib/campus/idVerification";
 
 export type AccountType = "Product Seller" | "Service Provider" | "Both";
 export type VerificationStatus = "unverified" | "pending" | "verified";
-export type IdDocumentType = "Student ID" | "Ghana Card" | "Voters ID";
+export type IdDocumentType = "Student ID" | "Ghana Card" | "Voters ID" | "Live Selfie";
 export type UserRole = "user" | "admin";
 export type SubscriptionTier = "free_launch" | "standard" | "plus" | "pro";
 export type SubscriptionStatus = "inactive" | "active" | "past_due" | "cancelled";
@@ -11,7 +11,13 @@ export type CategoryType = "product" | "service";
 export type ListingType = "product" | "service";
 export type PriceType = "Fixed" | "Starting from" | "Price range" | "Negotiable" | "Free";
 export type ListingStatus =
-  "Draft" | "Active" | "Paused" | "Sold" | "Unavailable" | "Rejected" | "Archived";
+  | "Draft"
+  | "Active"
+  | "Paused"
+  | "Sold"
+  | "Unavailable"
+  | "Rejected"
+  | "Archived";
 export type AudienceScope = "single" | "multiple" | "all";
 export type ReportReason =
   | "Scam or suspicious activity"
@@ -81,7 +87,7 @@ export interface ProfileRecord {
   verification_photo_confirmed: boolean;
   verification_submitted_at: string | null;
   verification_note: string | null;
-  verification_checks?: VerificationChecksPayload | null | undefined;
+  verification_checks?: VerificationChecksPayload | LiveSelfieChecks | null | undefined;
   subscription_tier?: SubscriptionTier | undefined;
   subscription_status?: SubscriptionStatus | undefined;
   subscription_expires_at?: string | null | undefined;
