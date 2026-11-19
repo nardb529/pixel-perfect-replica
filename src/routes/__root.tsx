@@ -13,7 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CampusProvider } from "@/components/campus/store";
-import { OnboardingPrompts, OfflineBanner } from "@/components/campus/pwa";
+import { OnboardingPrompts, OfflineBanner, InstallGate } from "@/components/campus/pwa";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { buildStructuredDataGraph, DEFAULT_SITE_URL } from "@/lib/campus/meta";
@@ -205,6 +205,7 @@ function RootComponent() {
           <OfflineBanner />
           <Outlet />
           <OnboardingPrompts />
+          <InstallGate />
           <Toaster position="top-center" />
         </CampusProvider>
       </ErrorBoundary>
