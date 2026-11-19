@@ -152,11 +152,11 @@ export function AuthPage() {
           <ul className="auth-aside-points">
             <li>
               <CheckCircle2 size={16} />
-              <span>Students verify with a Student ID &amp; real profile photo</span>
+              <span>Sellers verify with a quick live selfie</span>
             </li>
             <li>
               <CheckCircle2 size={16} />
-              <span>Non-students verify with a Ghana Card or Voter&apos;s ID</span>
+              <span>Buyers never need to verify</span>
             </li>
             <li>
               <ShieldCheck size={16} />
@@ -372,11 +372,9 @@ export function AuthPage() {
                         </button>
                       </div>
                       <small className="text-xs text-muted-foreground mt-1 block">
-                        {isStudent
-                          ? "After sign-up you will upload your Student ID and a matching real profile photo."
-                          : "After sign-up you will upload your Ghana Card or Voter's ID and a matching real profile photo."}{" "}
-                        Documents are used strictly for verification only in accordance with Ghana’s
-                        Data Protection Act, 2012 (Act 843).
+                        Sellers and service providers take a quick live selfie with their camera
+                        after sign-up. An Admin reviews it before you can post. Handled in line with
+                        Ghana’s Data Protection Act, 2012 (Act 843).
                       </small>
                     </div>
                   </>
