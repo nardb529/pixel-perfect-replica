@@ -97,11 +97,15 @@ export function PrivacyPage() {
               <h2>5. Ghana Data Protection Act, 2012 (Act 843)</h2>
             </div>
             <p>
-              {BRAND} strictly complies with the Ghana Data Protection Act, 2012 (Act 843). Student
-              IDs, Ghana Cards, Voter&apos;s IDs, and matching seller photos submitted during
-              verification are stored in private encrypted buckets, accessed solely by authorized
-              administrators to verify seller identity, and never used for any other purpose or
-              exposed publicly.
+              {BRAND} strictly complies with the Ghana Data Protection Act, 2012 (Act 843). The live
+              selfie that sellers and service providers submit during verification is stored in a
+              private bucket, accessed only by the seller and authorized administrators to check
+              that a real person is behind the account, and never used for any other purpose or
+              shown publicly. Camera pictures and video used for the liveness check are processed on
+              the device and are not uploaded or saved. We do not create or keep face-recognition
+              data. A selfie is deleted if verification is returned for resubmission, or when the
+              seller asks us to delete it or close the account. This is a basic safety check and
+              does not prove legal identity or guarantee fraud prevention.
             </p>
           </article>
         </div>
