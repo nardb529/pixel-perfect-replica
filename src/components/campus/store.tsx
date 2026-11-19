@@ -23,9 +23,11 @@ import {
 import { clearAnalyticsSessionCache } from "@/services/analyticsService";
 import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
 import {
+  getPushNotificationState,
   removePushSubscriptionForCurrentUser,
   showDeviceNotification,
   syncPushSubscriptionForCurrentUser,
+  type PushNotificationState,
 } from "@/lib/campus/push";
 import type {
   CategoryRecord,
@@ -183,7 +185,10 @@ type Store = {
   openInstallPrompt: () => void;
   closeInstallPrompt: () => void;
   notificationsEnabled: boolean;
+  pushState: PushNotificationState;
+  refreshPushState: () => Promise<PushNotificationState>;
   requestAppNotifications: () => Promise<"granted" | "denied" | "default" | "unsupported">;
+  disableAppNotifications: () => Promise<PushNotificationState>;
 };
 
 const CampusContext = createContext<Store | null>(null);
@@ -225,6 +230,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   const [sellerPostAuthStage, setSellerPostAuthStage] = useState<SellerPostAuthStage>("none");
   const [manualInstallOpen, setManualInstallOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [pushState, setPushState] = useState<PushNotificationState>("off");
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const dbUniversitiesRef = useRef<UniversityRecord[]>([]);
   dbUniversitiesRef.current = dbUniversities;
@@ -540,23 +546,52 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     setBuyerInstallOpen(false);
   }, []);
 
+  const refreshPushState = useCallback(async (): Promise<PushNotificationState> => {
+    const next = await getPushNotificationState();
+    setPushState(next);
+    setNotificationsEnabled(next === "on");
+    return next;
+  }, []);
+
+  useEffect(() => {
+    void refreshPushState();
+  }, [refreshPushState, user?.id]);
+
   const requestAppNotifications = useCallback(async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
+      setPushState("unsupported");
       return "unsupported" as const;
     }
     try {
       const permission = await Notification.requestPermission();
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
-      const granted = permission === "granted";
-      setNotificationsEnabled(granted);
-      if (granted) {
-        void syncPushSubscriptionForCurrentUser();
+      if (permission === "granted") {
+        const result = await syncPushSubscriptionForCurrentUser();
+        const nextState = result.subscribed ? "on" : await getPushNotificationState();
+        setPushState(nextState);
+        setNotificationsEnabled(nextState === "on");
+      } else if (permission === "denied") {
+        setPushState("blocked");
+        setNotificationsEnabled(false);
+      } else {
+        setPushState("off");
+        setNotificationsEnabled(false);
       }
       return permission;
     } catch {
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
+      setPushState("blocked");
+      setNotificationsEnabled(false);
       return "denied" as const;
     }
+  }, []);
+
+  const disableAppNotifications = useCallback(async (): Promise<PushNotificationState> => {
+    await removePushSubscriptionForCurrentUser();
+    const next = await getPushNotificationState();
+    setPushState(next);
+    setNotificationsEnabled(next === "on");
+    return next;
   }, []);
 
   const triggerSellerPostAuth = useCallback(() => {
@@ -768,7 +803,10 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       openInstallPrompt,
       closeInstallPrompt,
       notificationsEnabled,
+      pushState,
+      refreshPushState,
       requestAppNotifications,
+      disableAppNotifications,
     }),
     [
       backendConfigured,
@@ -823,7 +861,10 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       openInstallPrompt,
       closeInstallPrompt,
       notificationsEnabled,
+      pushState,
+      refreshPushState,
       requestAppNotifications,
+      disableAppNotifications,
     ],
   );
 

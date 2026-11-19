@@ -172,7 +172,6 @@ export function DiscoverPage() {
 
   return (
     <Shell>
-      <PageBackButton fallbackTo="/" label="Back" />
       <section className="surface-panel hero-panel curve-accent">
         <HeroAmbient />
 

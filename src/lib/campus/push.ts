@@ -1,5 +1,7 @@
 import { getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 
+export type PushNotificationState = "on" | "off" | "blocked" | "unsupported";
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -21,6 +23,38 @@ export function isPushSupported(): boolean {
   );
 }
 
+async function getReadyServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+  try {
+    await navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing?.active) return existing;
+    return await Promise.race<ServiceWorkerRegistration | null>([
+      navigator.serviceWorker.ready,
+      new Promise<ServiceWorkerRegistration | null>((resolve) =>
+        setTimeout(() => resolve(existing ?? null), 4000),
+      ),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
+export async function getPushNotificationState(): Promise<PushNotificationState> {
+  if (!isPushSupported()) return "unsupported";
+  if (Notification.permission === "denied") return "blocked";
+  if (Notification.permission !== "granted") return "off";
+
+  try {
+    const reg = await getReadyServiceWorkerRegistration();
+    if (!reg) return "off";
+    const subscription = await reg.pushManager.getSubscription();
+    return subscription ? "on" : "off";
+  } catch {
+    return "off";
+  }
+}
+
 export async function showDeviceNotification(input: {
   title: string;
   body: string;
@@ -40,12 +74,10 @@ export async function showDeviceNotification(input: {
   };
 
   try {
-    if ("serviceWorker" in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && typeof reg.showNotification === "function") {
-        await reg.showNotification(input.title, options);
-        return true;
-      }
+    const reg = await getReadyServiceWorkerRegistration();
+    if (reg && typeof reg.showNotification === "function") {
+      await reg.showNotification(input.title, options);
+      return true;
     }
   } catch {
     // Fallback to window Notification below
@@ -66,6 +98,9 @@ export async function syncPushSubscriptionForCurrentUser(): Promise<{
   if (!isPushSupported()) {
     return { subscribed: false, reason: "unsupported" };
   }
+  if (Notification.permission === "denied") {
+    return { subscribed: false, reason: "blocked" };
+  }
   if (Notification.permission !== "granted") {
     return { subscribed: false, reason: "permission_not_granted" };
   }
@@ -76,19 +111,29 @@ export async function syncPushSubscriptionForCurrentUser(): Promise<{
   }
 
   const user = await getSessionUser(client);
-  if (!user) {
+  const { data: sessionData } = await client.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!user || !accessToken) {
     return { subscribed: false, reason: "unauthenticated" };
   }
 
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await getReadyServiceWorkerRegistration();
+    if (!reg) {
+      return { subscribed: false, reason: "service_worker_unavailable" };
+    }
+
     const vapidKey =
       typeof import.meta !== "undefined" && import.meta.env?.["VITE_VAPID_PUBLIC_KEY"]
         ? String(import.meta.env["VITE_VAPID_PUBLIC_KEY"]).trim()
         : "";
 
+    if (!vapidKey) {
+      return { subscribed: false, reason: "missing_vapid_key" };
+    }
+
     let subscription = await reg.pushManager.getSubscription();
-    if (!subscription && vapidKey) {
+    if (!subscription) {
       subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
@@ -96,7 +141,7 @@ export async function syncPushSubscriptionForCurrentUser(): Promise<{
     }
 
     if (!subscription) {
-      return { subscribed: false, reason: vapidKey ? "subscribe_failed" : "missing_vapid_key" };
+      return { subscribed: false, reason: "subscribe_failed" };
     }
 
     const json = subscription.toJSON();
@@ -107,20 +152,18 @@ export async function syncPushSubscriptionForCurrentUser(): Promise<{
       return { subscribed: false, reason: "invalid_keys" };
     }
 
-    const { error } = await client.from("push_subscriptions").upsert(
-      {
-        user_id: user.id,
-        endpoint,
-        p256dh,
-        auth,
-        user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : "",
-        updated_at: new Date().toISOString(),
+    const response = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
       },
-      { onConflict: "user_id,endpoint" },
-    );
+      body: JSON.stringify({ endpoint, p256dh, auth }),
+    });
 
-    if (error) {
-      return { subscribed: false, reason: error.message };
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      return { subscribed: false, reason: payload?.error || "server_subscribe_failed" };
     }
 
     return { subscribed: true };
@@ -133,19 +176,28 @@ export async function removePushSubscriptionForCurrentUser(): Promise<void> {
   if (!isPushSupported()) return;
   const client = getSupabaseClient();
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await getReadyServiceWorkerRegistration();
+    if (!reg) return;
     const subscription = await reg.pushManager.getSubscription();
     if (!subscription) return;
+
     if (client) {
-      const user = await getSessionUser(client).catch(() => null);
-      if (user) {
-        await client
-          .from("push_subscriptions")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("endpoint", subscription.endpoint);
+      const { data: sessionData } = await client.auth.getSession().catch(() => ({
+        data: { session: null },
+      }));
+      const accessToken = sessionData.session?.access_token;
+      if (accessToken) {
+        await fetch("/api/push/unsubscribe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ endpoint: subscription.endpoint }),
+        }).catch(() => undefined);
       }
     }
+
     await subscription.unsubscribe().catch(() => undefined);
   } catch {
     // Best-effort cleanup

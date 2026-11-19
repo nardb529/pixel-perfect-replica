@@ -23,6 +23,94 @@ export function resolveAbsoluteOgImage(imagePath = "/og-marketplace.jpg"): strin
   return `${getCanonicalSiteUrl()}${normalized}`;
 }
 
+export function buildStructuredDataGraph(): Record<string, unknown> {
+  const siteUrl = DEFAULT_SITE_URL;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: BRAND,
+        url: siteUrl,
+        logo: {
+          "@type": "ImageObject",
+          url: `${siteUrl}/pwa-512x512.png`,
+          width: 512,
+          height: 512,
+        },
+        description:
+          "CampusLoop is Ghana's verified university campus marketplace connecting students and campus communities to buy and sell products and book local campus services without a buyer account.",
+        areaServed: {
+          "@type": "Country",
+          name: "Ghana",
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        url: siteUrl,
+        name: `${BRAND} — Ghana University Campus Marketplace`,
+        publisher: { "@id": `${siteUrl}/#organization` },
+        inLanguage: "en-GH",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteUrl}/products?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "WebApplication",
+        "@id": `${siteUrl}/#webapp`,
+        name: `${BRAND} Campus Marketplace`,
+        url: `${siteUrl}/discover`,
+        applicationCategory: "ShoppingApplication",
+        operatingSystem: "Android, iOS, Windows, macOS",
+        browserRequirements: "Requires JavaScript",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "GHS",
+          description: "Free for buyers across Ghanaian university campuses.",
+        },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${siteUrl}/#faq`,
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Do buyers need an account to shop on CampusLoop Ghana?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. Buyers can browse listings, filter by Ghanaian university, save favorites locally, and contact verified sellers directly on WhatsApp or phone call without creating an account.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How are sellers verified on CampusLoop?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Student sellers upload their Student ID alongside a matching real profile photo, while non-student campus sellers upload a Ghana Card or Voter's ID and matching real profile photo for admin approval.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Which Ghanaian universities are supported on CampusLoop?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "CampusLoop supports KNUST, University of Ghana (Legon), UCC, UPSA, UEW, UDS, UMaT, UENR, GCTU, UHAS, UESD, GIMPA, ATU, KsTU, TTU, and other accredited Ghanaian institutions.",
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export const pageHead = (
   title: string,
   description: string,
@@ -32,6 +120,7 @@ export const pageHead = (
     imageAlt?: string;
     type?: "website" | "profile";
     noIndex?: boolean;
+    keywords?: string;
   },
 ) => {
   const fullTitle = `${title} · ${BRAND} Campus Marketplace`;
@@ -45,14 +134,24 @@ export const pageHead = (
   const imageUrl = resolveAbsoluteOgImage(options?.imagePath || "/og-marketplace.jpg");
   const imageAlt =
     options?.imageAlt ||
-    `${BRAND} — Ghana University Campus Marketplace for student products and services`;
+    `${BRAND} — Ghana University Campus Marketplace showing student products and services priced in GH₵`;
 
   return {
     meta: [
       { title: fullTitle },
       { name: "description", content: description },
-      ...(options?.noIndex ? [{ name: "robots", content: "noindex, nofollow" }] : []),
+      {
+        name: "keywords",
+        content:
+          options?.keywords ||
+          "CampusLoop, Ghana campus marketplace, KNUST marketplace, University of Ghana market, UCC student market, buy and sell Ghana campus, student laptops Ghana, Ghana campus services",
+      },
+      { name: "author", content: BRAND },
+      ...(options?.noIndex
+        ? [{ name: "robots", content: "noindex, nofollow" }]
+        : [{ name: "robots", content: "index, follow, max-image-preview:large" }]),
       { property: "og:site_name", content: `${BRAND} Marketplace` },
+      { property: "og:locale", content: "en_GH" },
       { property: "og:title", content: fullTitle },
       { property: "og:description", content: description },
       { property: "og:type", content: options?.type || "website" },
@@ -65,6 +164,7 @@ export const pageHead = (
       { name: "twitter:title", content: fullTitle },
       { name: "twitter:description", content: description },
       { name: "twitter:image", content: imageUrl },
+      { name: "twitter:image:alt", content: imageAlt },
     ],
     links: canonicalUrl && !options?.noIndex ? [{ rel: "canonical", href: canonicalUrl }] : [],
   };

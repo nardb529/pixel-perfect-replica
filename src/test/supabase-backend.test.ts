@@ -61,7 +61,7 @@ describe("Supabase client & credential safety", () => {
     expect(second).toBe(first);
   });
 
-  it("never embeds SUPABASE_SERVICE_ROLE_KEY inside src/", () => {
+  it("never exposes server-only secrets inside client src/ or any VITE_ variables", () => {
     const srcRoot = join(process.cwd(), "src");
     const files: string[] = [];
     const walk = (dir: string) => {
@@ -75,8 +75,16 @@ describe("Supabase client & credential safety", () => {
     };
     walk(srcRoot);
     for (const file of files) {
+      const normalized = file.replace(/\\/g, "/");
       const content = readFileSync(file, "utf8");
-      expect(content).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+      expect(content).not.toContain("VITE_SUPABASE_SERVICE_ROLE_KEY");
+      expect(content).not.toContain("VITE_VAPID_PRIVATE_KEY");
+      const isServerOnly =
+        normalized.includes("/src/routes/api/") || normalized.includes("/src/lib/server/");
+      if (!isServerOnly) {
+        expect(content).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+        expect(content).not.toContain("VAPID_PRIVATE_KEY");
+      }
     }
   });
 });
@@ -305,13 +313,28 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     }
   });
 
-  it("adapts viewport safe areas, anchors floating navbar at very bottom, and bolds dock buttons", () => {
-    expect(stylesCss).toContain("bottom: max(4px, env(safe-area-inset-bottom));");
+  it("adapts viewport safe areas, anchors floating navbar low at bottom, and bolds dock buttons", () => {
+    expect(stylesCss).toContain("bottom: max(2px, calc(env(safe-area-inset-bottom) * 0.2));");
     expect(stylesCss).toContain("max-width: 392px;\n    height: 70px;");
-    expect(stylesCss).toContain(
-      "padding: 10px max(12px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom))",
-    );
+    expect(stylesCss).toContain("calc(88px + env(safe-area-inset-bottom) * 0.35)");
     expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
+  });
+
+  it("includes push_subscriptions migration, strict per-user RLS, and sw.js campusloop-v7", () => {
+    const pushMigration = readFileSync(
+      join(process.cwd(), "supabase/migrations/202611190001_push_subscriptions.sql"),
+      "utf8",
+    );
+    const swCode = readFileSync(join(process.cwd(), "public/sw.js"), "utf8");
+    expect(pushMigration).toContain("references auth.users(id) on delete cascade");
+    expect(pushMigration).toContain("endpoint text not null unique");
+    expect(pushMigration).toContain("on public.push_subscriptions for select");
+    expect(pushMigration).toContain("on public.push_subscriptions for insert");
+    expect(pushMigration).toContain("on public.push_subscriptions for delete");
+    expect(setupSql).toContain("Migration: 202611190001_push_subscriptions.sql");
+    expect(swCode).toContain('const CACHE_NAME = "campusloop-v7"');
+    expect(swCode).toContain('addEventListener("push"');
+    expect(swCode).toContain('addEventListener("notificationclick"');
   });
 
   it("enforces seller verification security layer with private ID storage and verified-seller listing RLS", () => {

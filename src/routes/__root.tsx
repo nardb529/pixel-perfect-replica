@@ -16,6 +16,7 @@ import { CampusProvider } from "@/components/campus/store";
 import { OnboardingPrompts, OfflineBanner } from "@/components/campus/pwa";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
+import { buildStructuredDataGraph, DEFAULT_SITE_URL } from "@/lib/campus/meta";
 
 function NotFoundComponent() {
   return (
@@ -88,12 +89,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "CampusLoop is the Ghana university campus marketplace for student products, verified services, books, electronics, and hostelling essentials. Buyers need no account.",
       },
+      {
+        name: "keywords",
+        content:
+          "CampusLoop, Ghana university marketplace, KNUST buy and sell, University of Ghana Legon market, UCC campus market, UPSA market, student electronics Ghana, Ghana campus services",
+      },
+      { name: "author", content: "CampusLoop" },
+      { name: "application-name", content: "CampusLoop" },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
       { name: "theme-color", content: "#4965F5" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "CampusLoop" },
       { property: "og:site_name", content: "CampusLoop Marketplace" },
+      { property: "og:locale", content: "en_GH" },
       { property: "og:title", content: "CampusLoop — Ghana University Campus Marketplace" },
       {
         property: "og:description",
@@ -103,10 +113,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       {
         property: "og:image",
-        content: "https://pixel-perfect-replica-five-psi.vercel.app/og-marketplace.jpg",
+        content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
       },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
+      {
+        property: "og:image:alt",
+        content: "CampusLoop Marketplace screenshot showing Ghana campus products and services",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "CampusLoop — Ghana University Campus Marketplace" },
       {
@@ -116,7 +130,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         name: "twitter:image",
-        content: "https://pixel-perfect-replica-five-psi.vercel.app/og-marketplace.jpg",
+        content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
       },
     ],
     links: [
@@ -133,6 +147,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      {
+        rel: "alternate",
+        type: "text/plain",
+        title: "CampusLoop AI & LLM Marketplace Guide",
+        href: "/llms.txt",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -148,6 +168,12 @@ function RootShell({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('cl_theme_v1');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(buildStructuredDataGraph()),
           }}
         />
         <HeadContent />

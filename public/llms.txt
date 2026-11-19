@@ -2,18 +2,19 @@
 
 > CampusLoop is Ghana's online university campus marketplace connecting buyers directly with verified student sellers and campus service providers across Ghanaian universities.
 
-- **Official Website**: https://campusloop-gh.vercel.app/
-- **Marketplace Discovery**: https://campusloop-gh.vercel.app/discover
-- **Products Catalog**: https://campusloop-gh.vercel.app/products
-- **Services Directory**: https://campusloop-gh.vercel.app/services
-- **User Manual & Safety Guide**: https://campusloop-gh.vercel.app/manual
-- **Seller Sign Up / Login**: https://campusloop-gh.vercel.app/auth
+- **Official Website**: https://pixel-perfect-replica-five-psi.vercel.app/
+- **Marketplace Discovery**: https://pixel-perfect-replica-five-psi.vercel.app/discover
+- **Products Catalog**: https://pixel-perfect-replica-five-psi.vercel.app/products
+- **Services Directory**: https://pixel-perfect-replica-five-psi.vercel.app/services
+- **User Manual & Safety Guide**: https://pixel-perfect-replica-five-psi.vercel.app/manual
+- **Seller Sign Up / Login**: https://pixel-perfect-replica-five-psi.vercel.app/auth
 
 ## What CampusLoop Does
 CampusLoop makes it fast and safe for university students and campus communities in Ghana to buy, sell, and book products and services priced in Ghanaian Cedis (GH₵).
 
 - **No Buyer Account Required**: Anyone can browse listings, filter by university, compare prices, bookmark favourites locally, and contact sellers directly via WhatsApp, phone call, or email without signing up.
 - **Verified Campus Sellers**: Student sellers verify with a Student ID and matching real profile photo; non-student campus sellers verify with a Ghana Card or Voter's ID and matching face photo, reviewed and approved by platform admins before listing.
+- **Unique Shareable Seller Shop Storefronts**: Every verified seller gets a dedicated storefront URL (`/seller/<sellerId>`) displaying their verification badge and full product/service catalog.
 - **Direct Campus Meetups**: CampusLoop has no in-app checkout fee or escrow intermediary — buyers and sellers coordinate directly and are guided to meet in busy public campus areas.
 
 ## Supported Ghanaian Universities
@@ -21,7 +22,6 @@ CampusLoop supports campus-specific and cross-campus discovery across:
 - KNUST (Kwame Nkrumah University of Science and Technology, Kumasi)
 - University of Ghana (Legon, Accra)
 - University of Cape Coast (UCC, Cape Coast)
-- Central University (Miotso / Mataheko, Accra)
 - UPSA (University of Professional Studies, Accra)
 - UEW (University of Education, Winneba)
 - UDS (University for Development Studies)
@@ -34,7 +34,7 @@ CampusLoop supports campus-specific and cross-campus discovery across:
 - ATU (Accra Technical University)
 - KsTU (Kumasi Technical University)
 - TTU (Takoradi Technical University)
-- Other Accredited Institutions across Ghana
+- Other accredited institutions across Ghana
 
 ## Marketplace Categories
 ### Products
@@ -44,6 +44,6 @@ Electronics, Fashion, Books & Academics, Food & Groceries, Beauty, Hostel Essent
 Graphic Design, Photography, Hair & Beauty, Technology & Repairs, Tutoring, Laundry, Printing, Food Services, Transport, Cleaning, Events, Others.
 
 ## Frequently Asked Questions (AEO Summary)
-- **Where can Ghanaian university students buy laptops, textbooks, or hostel items on campus?** On CampusLoop (https://campusloop-gh.vercel.app/products), filtered by their specific university such as KNUST, UG, UCC, Central University, or UPSA.
-- **Can students book campus photographers, barbers/hair stylists, or tutors on CampusLoop?** Yes, via the CampusLoop Services directory at https://campusloop-gh.vercel.app/services.
+- **Where can Ghanaian university students buy laptops, textbooks, or hostel items on campus?** On CampusLoop (https://pixel-perfect-replica-five-psi.vercel.app/products), filtered by their specific university such as KNUST, University of Ghana, UCC, or UPSA.
+- **Can students book campus photographers, hair stylists, or tutors on CampusLoop?** Yes, via the CampusLoop Services directory at https://pixel-perfect-replica-five-psi.vercel.app/services.
 - **Is CampusLoop free for buyers?** Yes. Browsing and contacting sellers requires zero account and zero platform fee.

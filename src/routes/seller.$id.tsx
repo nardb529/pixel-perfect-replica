@@ -8,13 +8,15 @@ const ProfilePage = lazy(() =>
 );
 
 export const Route = createFileRoute("/seller/$id")({
-  head: () =>
+  head: ({ params }) =>
     pageHead(
       "Seller Shop Storefront",
-      "Explore all campus products and services from this CampusLoop seller shop. Contact directly on WhatsApp or phone — no buyer account required.",
+      "Explore all campus products and services from this verified CampusLoop seller shop. Contact directly on WhatsApp or phone — no buyer account required.",
       {
+        path: `/seller/${params.id}`,
         imagePath: "/og-shop.jpg",
-        imageAlt: "CampusLoop Seller Shop Storefront — Campus Products and Services",
+        imageAlt:
+          "CampusLoop Seller Shop Storefront screenshot showing verified seller badge, products, and services in GH₵",
         type: "profile",
       },
     ),

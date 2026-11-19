@@ -21,6 +21,8 @@ import {
   Briefcase,
   Search,
   Store as StoreIcon,
+  BellRing,
+  BellOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -67,6 +69,10 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     toggleTheme,
     openInstallPrompt,
     isStandalone,
+    isIOS,
+    pushState,
+    requestAppNotifications,
+    disableAppNotifications,
   } = useCampus();
 
   const [editing, setEditing] = useState(false);
@@ -83,6 +89,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const [loadingSeller, setLoadingSeller] = useState<boolean>(
     Boolean(sellerId && backendConfigured),
   );
+  const [updatingPush, setUpdatingPush] = useState(false);
 
   const dbUniversitiesRef = useRef(dbUniversities);
   dbUniversitiesRef.current = dbUniversities;
@@ -265,6 +272,38 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       toast.error(toUserSafeErrorMessage(err));
     } finally {
       setUploadingAvatar(false);
+    }
+  }
+
+  async function handleEnablePush() {
+    setUpdatingPush(true);
+    try {
+      const permission = await requestAppNotifications();
+      if (permission === "granted") {
+        toast.success("Notifications turned on for this device");
+      } else if (permission === "denied") {
+        toast.info("Notifications are blocked in your browser settings");
+      } else if (permission === "unsupported") {
+        toast.info(
+          isIOS
+            ? "On iPhone, add CampusLoop to your Home Screen first (iOS 16.4+ required)"
+            : "Push notifications are not supported in this browser",
+        );
+      } else {
+        toast.info("Notification prompt dismissed");
+      }
+    } finally {
+      setUpdatingPush(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setUpdatingPush(true);
+    try {
+      await disableAppNotifications();
+      toast.success("Notifications turned off on this device");
+    } finally {
+      setUpdatingPush(false);
     }
   }
 
@@ -611,6 +650,74 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
             )}
           </section>
         )
+      )}
+
+      {!sellerId && user && (
+        <section className="surface-panel section-panel">
+          <SectionTitle eyebrow="Device Alerts" title="Phone & Browser Notifications">
+            <span
+              className={`status-pill ${
+                pushState === "on"
+                  ? "status-pill-verified"
+                  : pushState === "blocked"
+                    ? "status-pill-warning"
+                    : "status-pill-muted"
+              }`}
+              data-testid="push-status-label"
+            >
+              {pushState === "on"
+                ? "On"
+                : pushState === "blocked"
+                  ? "Blocked"
+                  : pushState === "unsupported"
+                    ? "Unsupported"
+                    : "Off"}
+            </span>
+          </SectionTitle>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+              {pushState === "on"
+                ? "Notifications are active on this device. CampusLoop announcements will arrive on your lock screen even when the app is closed."
+                : pushState === "blocked"
+                  ? "Notifications are currently blocked in your browser or phone settings. Allow notifications for CampusLoop in site settings, then tap Turn on notifications again."
+                  : pushState === "unsupported"
+                    ? "This browser context does not support Web Push notifications yet."
+                    : "Receive important CampusLoop admin updates and seller verification alerts directly on your phone."}
+            </p>
+
+            {isIOS && (
+              <div className="rounded-xl border border-border/80 bg-muted/40 p-3 text-xs leading-relaxed text-foreground">
+                <strong>iPhone guide:</strong> Tap <strong>Share</strong>, choose{" "}
+                <strong>Add to Home Screen</strong>, open CampusLoop from your Home Screen, and tap{" "}
+                <strong>Turn on notifications</strong> (<strong>iOS 16.4 or later</strong> is
+                required).
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {pushState === "on" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={updatingPush}
+                  onClick={() => void handleDisablePush()}
+                >
+                  <BellOff size={15} />
+                  {updatingPush ? "Updating..." : "Turn off notifications"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={updatingPush || pushState === "unsupported"}
+                  onClick={() => void handleEnablePush()}
+                >
+                  <BellRing size={15} />
+                  {updatingPush ? "Enabling..." : "Turn on notifications"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </section>
       )}
 
       {!sellerId && (

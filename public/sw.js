@@ -1,4 +1,4 @@
-const CACHE_NAME = "campusloop-v6";
+const CACHE_NAME = "campusloop-v7";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.svg",
@@ -119,10 +119,13 @@ self.addEventListener("push", (event) => {
     try {
       const parsed = event.data.json();
       payload = {
-        title: parsed.title || payload.title,
-        body: parsed.message || parsed.body || payload.body,
-        url: parsed.url || payload.url,
-        tag: parsed.tag || parsed.id || payload.tag,
+        title: (parsed.title && String(parsed.title).trim()) || "CampusLoop",
+        body:
+          (parsed.body && String(parsed.body).trim()) ||
+          (parsed.message && String(parsed.message).trim()) ||
+          payload.body,
+        url: (parsed.url && String(parsed.url).trim()) || "/dashboard",
+        tag: (parsed.tag && String(parsed.tag).trim()) || parsed.id || payload.tag,
       };
     } catch {
       const rawText = event.data.text();

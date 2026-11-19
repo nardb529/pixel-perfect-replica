@@ -197,7 +197,9 @@ export function AdminPage() {
   const [broadcastType, setBroadcastType] = useState<NotificationType>("platform_announcement");
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastUrl, setBroadcastUrl] = useState("/dashboard");
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [lastDeliveryText, setLastDeliveryText] = useState<string | null>(null);
 
   // Promotion form
   const [newPromoName, setNewPromoName] = useState("");
@@ -654,17 +656,27 @@ export function AdminPage() {
     }
 
     setSendingBroadcast(true);
+    setLastDeliveryText(null);
     try {
-      const sentCount = await adminService.sendBroadcastNotification({
+      const result = await adminService.sendBroadcastNotification({
         title: broadcastTitle,
         message: broadcastMessage,
+        url: broadcastUrl.trim() || "/dashboard",
+        audience: broadcastScope as "all" | "verified" | "university" | "single",
+        universityId: broadcastScope === "university" ? broadcastUniId : undefined,
+        userId: broadcastScope === "single" ? broadcastUserId : undefined,
         notificationType: broadcastType,
         targetUserIds: broadcastTargets,
         scopeLabel: broadcastScope,
       });
-      toast.success(`Announcement delivered to ${sentCount} account${sentCount === 1 ? "" : "s"}`);
+      const deviceText = `Delivered to ${result.deliveredDevices} device${result.deliveredDevices === 1 ? "" : "s"}`;
+      setLastDeliveryText(deviceText);
+      toast.success(
+        `${deviceText} (${result.recipientCount} account${result.recipientCount === 1 ? "" : "s"})`,
+      );
       setBroadcastTitle("");
       setBroadcastMessage("");
+      setBroadcastUrl("/dashboard");
       await Promise.all([loadAdminWorkspace(), refreshNotifications()]);
     } catch (err) {
       toast.error(toUserSafeErrorMessage(err));
@@ -1757,13 +1769,31 @@ export function AdminPage() {
                   <textarea
                     required
                     rows={4}
-                    placeholder="Write the message users will see in their Dashboard notifications..."
+                    placeholder="Write the message users will see in their phone & Dashboard notifications..."
                     value={broadcastMessage}
                     onChange={(e) => setBroadcastMessage(e.target.value)}
                   />
                 </label>
 
-                <div className="flex justify-end">
+                <label className="form-field">
+                  <span>Page link (opens when user taps notification)</span>
+                  <input
+                    placeholder="/dashboard"
+                    value={broadcastUrl}
+                    onChange={(e) => setBroadcastUrl(e.target.value)}
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {lastDeliveryText ? (
+                    <span className="status-text-success text-sm font-semibold" role="status">
+                      {lastDeliveryText}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      Sends instant Web Push to subscribed phones even when CampusLoop is closed.
+                    </span>
+                  )}
                   <Button
                     type="submit"
                     className="dashboard-create-btn whitespace-nowrap shrink-0"

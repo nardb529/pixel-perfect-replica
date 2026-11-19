@@ -424,17 +424,18 @@ create index if not exists idx_notifications_user_unread
 -- Web Push device subscriptions (allows OS notifications when installed app is closed)
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  endpoint text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
   p256dh text not null,
   auth text not null,
-  user_agent text not null default '',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (user_id, endpoint)
+  created_at timestamptz not null default now()
 );
 
-create index if not exists idx_push_subscriptions_user on public.push_subscriptions (user_id);
+create unique index if not exists idx_push_subscriptions_endpoint
+  on public.push_subscriptions (endpoint);
+
+create index if not exists idx_push_subscriptions_user
+  on public.push_subscriptions (user_id);
 
 -- Seller monthly subscriptions (billing launches 1st December, 2026 via Paystack)
 create table if not exists public.seller_subscriptions (
@@ -1868,12 +1869,23 @@ create policy "Admins send notifications"
   on public.notifications for insert
   with check (public.is_admin());
 
--- Push Subscriptions: users manage their own device subscriptions
+-- Push Subscriptions: users insert, select, and delete only their own rows
 drop policy if exists "Users manage own push subscriptions" on public.push_subscriptions;
-create policy "Users manage own push subscriptions"
-  on public.push_subscriptions for all
-  using (auth.uid() = user_id or public.is_admin())
-  with check (auth.uid() = user_id or public.is_admin());
+drop policy if exists "Users select own push subscriptions" on public.push_subscriptions;
+drop policy if exists "Users insert own push subscriptions" on public.push_subscriptions;
+drop policy if exists "Users delete own push subscriptions" on public.push_subscriptions;
+
+create policy "Users select own push subscriptions"
+  on public.push_subscriptions for select
+  using (auth.uid() = user_id);
+
+create policy "Users insert own push subscriptions"
+  on public.push_subscriptions for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users delete own push subscriptions"
+  on public.push_subscriptions for delete
+  using (auth.uid() = user_id);
 
 -- Seller Subscriptions: owners view own billing history; admins/service_role manage
 drop policy if exists "Owners and admins view subscriptions" on public.seller_subscriptions;
@@ -2056,5 +2068,59 @@ values
   ('promoted-service-14d', 'Promoted Campus Service (14 days)', 'Boost visibility for student service providers across targeted universities.', 'service', 14, 40.00, false),
   ('campus-spotlight-30d', 'University Spotlight Slot (30 days)', 'Future sponsored campus announcement slot managed by administrators.', 'banner', 30, 150.00, false)
 on conflict (plan_key) do nothing;
+
+-- Migration: 202611190001_push_subscriptions.sql
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'push_subscriptions'
+  ) then
+    alter table public.push_subscriptions
+      drop constraint if exists push_subscriptions_user_id_fkey;
+    alter table public.push_subscriptions
+      add constraint push_subscriptions_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+
+    alter table public.push_subscriptions
+      drop constraint if exists push_subscriptions_user_id_endpoint_key;
+  end if;
+exception
+  when duplicate_object then null;
+end $$;
+
+create unique index if not exists idx_push_subscriptions_endpoint
+  on public.push_subscriptions (endpoint);
+
+create index if not exists idx_push_subscriptions_user
+  on public.push_subscriptions (user_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "Users manage own push subscriptions" on public.push_subscriptions;
+drop policy if exists "Users select own push subscriptions" on public.push_subscriptions;
+drop policy if exists "Users insert own push subscriptions" on public.push_subscriptions;
+drop policy if exists "Users delete own push subscriptions" on public.push_subscriptions;
+
+create policy "Users select own push subscriptions"
+  on public.push_subscriptions for select
+  using (auth.uid() = user_id);
+
+create policy "Users insert own push subscriptions"
+  on public.push_subscriptions for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users delete own push subscriptions"
+  on public.push_subscriptions for delete
+  using (auth.uid() = user_id);
 
 notify pgrst, 'reload schema';

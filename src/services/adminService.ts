@@ -48,6 +48,15 @@ export type ModerationLogRecord = {
   created_at: string;
 };
 
+export type BroadcastDeliveryResult = {
+  recipientCount: number;
+  deliveredDevices: number;
+  failedDevices: number;
+  pruned: number;
+  url: string;
+  vapidConfigured?: boolean | undefined;
+};
+
 async function writeAuditLog(action: string, targetType: string, targetId: string, notes?: string) {
   const supabase = requireSupabase();
   const user = await getSessionUser(supabase);
@@ -216,11 +225,24 @@ export const adminService = {
     });
     if (notifErr) throw notifErr;
 
-    void supabase.functions
-      .invoke("push-send", {
-        body: { userIds: [userId], title, message, url: "/dashboard" },
-      })
-      .catch(() => undefined);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (accessToken) {
+      void fetch("/api/push/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          userIds: [userId],
+          title,
+          message,
+          url: "/dashboard",
+          skipInAppInsert: true,
+        }),
+      }).catch(() => undefined);
+    }
   },
 
   async updateUserRole(userId: string, role: UserRole): Promise<void> {
@@ -247,63 +269,83 @@ export const adminService = {
     });
     if (notifErr) throw notifErr;
 
-    void supabase.functions
-      .invoke("push-send", {
-        body: {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (accessToken) {
+      void fetch("/api/push/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
           userIds: [userId],
           title,
           message,
           url: role === "admin" ? "/admin" : "/dashboard",
-        },
-      })
-      .catch(() => undefined);
+          skipInAppInsert: true,
+        }),
+      }).catch(() => undefined);
+    }
   },
 
   async sendBroadcastNotification(input: {
     title: string;
     message: string;
+    url?: string | undefined;
+    audience?: "all" | "verified" | "university" | "single" | undefined;
+    universityId?: string | undefined;
+    userId?: string | undefined;
     targetUserIds: string[];
     notificationType?: NotificationType | undefined;
     scopeLabel?: string | undefined;
-  }): Promise<number> {
+  }): Promise<BroadcastDeliveryResult> {
     const supabase = requireSupabase();
-    const uniqueIds = Array.from(new Set(input.targetUserIds.filter(Boolean)));
-    if (uniqueIds.length === 0) return 0;
-
     const cleanTitle = input.title.trim();
     const cleanMessage = input.message.trim();
-    const rows = uniqueIds.map((uid) => ({
-      user_id: uid,
-      title: cleanTitle,
-      message: cleanMessage,
-      notification_type: (input.notificationType ?? "platform_announcement") as NotificationType,
-      metadata: { scope: input.scopeLabel ?? "broadcast" },
-    }));
+    const cleanUrl = input.url?.trim() || "/dashboard";
 
-    const { error } = await supabase.from("notifications").insert(rows);
-    if (error) throw error;
-
-    void supabase.functions
-      .invoke("push-send", {
-        body: {
-          userIds: uniqueIds,
-          title: cleanTitle,
-          message: cleanMessage,
-          url: "/dashboard",
-        },
-      })
-      .catch(() => undefined);
-
-    const user = await getSessionUser(supabase);
-    if (user) {
-      await writeAuditLog(
-        "platform_broadcast",
-        "notifications",
-        user.id,
-        `${cleanTitle} → ${uniqueIds.length} recipient(s)`,
-      );
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      throw new Error("Please sign in again before sending notifications.");
     }
-    return uniqueIds.length;
+
+    const response = await fetch("/api/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        title: cleanTitle,
+        message: cleanMessage,
+        url: cleanUrl,
+        audience: input.audience,
+        universityId: input.universityId,
+        userId: input.userId,
+        userIds: Array.from(new Set(input.targetUserIds.filter(Boolean))),
+        notificationType: input.notificationType ?? "platform_announcement",
+        scopeLabel: input.scopeLabel ?? input.audience ?? "broadcast",
+      }),
+    });
+
+    const data = (await response.json().catch(() => ({}))) as Partial<BroadcastDeliveryResult> & {
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to send notifications.");
+    }
+
+    return {
+      recipientCount: Number(data.recipientCount ?? input.targetUserIds.length ?? 0),
+      deliveredDevices: Number(data.deliveredDevices ?? 0),
+      failedDevices: Number(data.failedDevices ?? 0),
+      pruned: Number(data.pruned ?? 0),
+      url: data.url || cleanUrl,
+      vapidConfigured: data.vapidConfigured,
+    };
   },
 
   async resolveReport(reportId: string, status: ReportStatus, note?: string): Promise<void> {
