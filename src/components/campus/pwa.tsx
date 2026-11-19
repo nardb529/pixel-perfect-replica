@@ -43,6 +43,9 @@ export function OnboardingPrompts() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [deviceTab, setDeviceTab] = useState<DeviceTab>("android");
   const [installing, setInstalling] = useState(false);
+  const isPhoneDevice =
+    typeof navigator !== "undefined" &&
+    /iPhone|iPod|Android.+Mobile|Mobile.+Android/i.test(navigator.userAgent || "");
 
   useEffect(() => {
     if (isIOS) {
@@ -394,9 +397,11 @@ export function OnboardingPrompts() {
                       : "Got it, Add to Home Screen"}
                 </span>
               </Button>
-              <Button variant="ghost" className="onboarding-skip" onClick={handleCloseInstall}>
-                Continue in browser
-              </Button>
+              {!canNativeInstall && !isPhoneDevice ? (
+                <Button variant="ghost" className="onboarding-skip" onClick={handleCloseInstall}>
+                  Continue in browser
+                </Button>
+              ) : null}
             </div>
           </div>
         </DialogContent>
