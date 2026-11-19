@@ -17,6 +17,9 @@ import {
   Bell,
   TrendingUp,
   Shield,
+  ShieldCheck,
+  CreditCard,
+  Phone,
   Store as StoreIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +35,7 @@ import {
   Empty,
   AnimatedSelect,
   PagePendingFallback,
+  PageBackButton,
 } from "./shared";
 import {
   TECHNICAL_ISSUE_MESSAGE,
@@ -42,7 +46,23 @@ import {
   priceTypes,
   type Listing,
 } from "@/lib/campus/data";
-import { analyticsService, listingService, notificationService, profileService } from "@/services";
+import {
+  SELLER_PLANS,
+  SPECIAL_OFFER_PHONE,
+  SPECIAL_OFFER_TEL_HREF,
+  SPECIAL_OFFER_WHATSAPP_HREF,
+  SUBSCRIPTION_LAUNCH_LABEL,
+  getSellerEffectiveLimits,
+  isSubscriptionBillingLive,
+} from "@/lib/campus/plans";
+import { isPushSupported } from "@/lib/campus/push";
+import {
+  analyticsService,
+  listingService,
+  notificationService,
+  profileService,
+  subscriptionService,
+} from "@/services";
 import type {
   AccountType,
   ListingStatus,
@@ -85,6 +105,8 @@ export function DashboardPage() {
     universityNames,
     dbUniversities,
     signOutUser,
+    notificationsEnabled,
+    requestAppNotifications,
   } = useCampus();
 
   const [tab, setTab] = useState("Overview");
@@ -93,6 +115,8 @@ export function DashboardPage() {
   const [deleting, setDeleting] = useState<Listing | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [selectedAffiliations, setSelectedAffiliations] = useState<string[]>([]);
+  const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
+  const [pushRequesting, setPushRequesting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -134,6 +158,8 @@ export function DashboardPage() {
 
   const isSuspended = Boolean(user.isSuspended);
   const mine = backendConfigured ? myListings : [];
+  const limits = getSellerEffectiveLimits(user);
+  const activeListingCount = mine.filter((l) => (l.rawStatus ?? l.status) !== "Archived").length;
 
   const activeCount =
     analytics?.active_listings ?? mine.filter((l) => l.status === "Active").length;
@@ -278,16 +304,30 @@ export function DashboardPage() {
 
   return (
     <Shell>
+      <PageBackButton fallbackTo="/discover" label="Back" />
+
       <section className="surface-panel hero-panel dashboard-hero-panel curve-accent">
         <HeroAmbient />
 
         <div className="dashboard-top">
-          <PageIntro
-            eyebrow={user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
-            title={`Welcome back, ${user.name.split(" ")[0]}`}
-            text="Manage your products, services, performance and enquiries."
-          />
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="dashboard-header-info">
+            <PageIntro
+              eyebrow={user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
+              title={`Welcome back, ${user.name.split(" ")[0]}`}
+              text="Manage your products, services, performance and enquiries."
+            />
+            <div className="seller-quota-pill">
+              <ShieldCheck size={14} aria-hidden="true" />
+              <span>
+                {limits.planLabel} ·{" "}
+                <strong>
+                  {activeListingCount}/{limits.maxListings}
+                </strong>{" "}
+                uploads · max {limits.maxImagesPerListing} photos/item
+              </span>
+            </div>
+          </div>
+          <div className="dashboard-header-actions">
             {user.role === "admin" && !isSuspended && (
               <Button variant="outline" className="admin-launch-btn" asChild>
                 <Link to="/admin">
@@ -327,6 +367,10 @@ export function DashboardPage() {
           >
             <Bell size={15} />
             Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
+          </Button>
+          <Button variant={tab === "Plans" ? "default" : "ghost"} onClick={() => setTab("Plans")}>
+            <CreditCard size={15} />
+            Plans
           </Button>
           {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
             <Button variant="ghost" asChild>
@@ -454,6 +498,99 @@ export function DashboardPage() {
             </div>
           </form>
         </section>
+      ) : tab === "Plans" ? (
+        <section className="surface-panel section-panel">
+          <SectionTitle
+            eyebrow={`Starts ${SUBSCRIPTION_LAUNCH_LABEL}`}
+            title="Seller Subscription Plans"
+          />
+          <p className="profile-bio">
+            Launch access is free right now until <strong>{SUBSCRIPTION_LAUNCH_LABEL}</strong> (up
+            to 5 product/service uploads per account, maximum 3 photos per listing). Monthly
+            Paystack seller plans activate on <strong>{SUBSCRIPTION_LAUNCH_LABEL}</strong>.
+          </p>
+
+          <div className="special-offer-banner">
+            <div>
+              <strong>CONTACT US FOR A SPECIAL OFFER : {SPECIAL_OFFER_PHONE}</strong>
+              <small>
+                Want an early bundle, campus store setup, or custom seller capacity? Call or message
+                us directly.
+              </small>
+            </div>
+            <div className="special-offer-actions">
+              <Button variant="outline" asChild>
+                <a href={SPECIAL_OFFER_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle size={15} />
+                  WhatsApp
+                </a>
+              </Button>
+              <Button asChild>
+                <a href={SPECIAL_OFFER_TEL_HREF}>
+                  <Phone size={15} />
+                  Call {SPECIAL_OFFER_PHONE}
+                </a>
+              </Button>
+            </div>
+          </div>
+
+          <div className="plans-grid">
+            {SELLER_PLANS.map((plan) => {
+              const isCurrent = limits.billingActive && limits.tier === plan.id;
+              return (
+                <article
+                  key={plan.id}
+                  className={`plan-card ${plan.recommended ? "is-recommended" : ""}`}
+                >
+                  <div className="plan-card-head">
+                    <div>
+                      <span className="section-kicker">{plan.name}</span>
+                      <h3>
+                        GH₵ {plan.priceGhs} <small>/ month</small>
+                      </h3>
+                    </div>
+                    {plan.recommended && <span className="plan-badge">Popular</span>}
+                  </div>
+                  <p className="plan-summary">{plan.summary}</p>
+                  <ul className="plan-features">
+                    {plan.features.map((feat) => (
+                      <li key={feat}>
+                        <Check size={14} aria-hidden="true" />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    type="button"
+                    variant={plan.recommended ? "default" : "outline"}
+                    disabled={isCurrent || startingPlanId === plan.id}
+                    onClick={() => {
+                      setStartingPlanId(plan.id);
+                      void subscriptionService
+                        .initializePaystackCheckout(plan.id)
+                        .then(({ authorizationUrl }) => {
+                          window.location.href = authorizationUrl;
+                        })
+                        .catch((err) => {
+                          toast.error(toUserSafeErrorMessage(err));
+                        })
+                        .finally(() => setStartingPlanId(null));
+                    }}
+                  >
+                    <CreditCard size={15} />
+                    {isCurrent
+                      ? "Current active plan"
+                      : startingPlanId === plan.id
+                        ? "Connecting to Paystack..."
+                        : isSubscriptionBillingLive()
+                          ? "Subscribe via Paystack"
+                          : "Paystack opens 1st Dec 2026"}
+                  </Button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       ) : tab === "Notifications" ? (
         <section className="surface-panel section-panel">
           <SectionTitle title="Notifications">
@@ -463,6 +600,41 @@ export function DashboardPage() {
               </Button>
             )}
           </SectionTitle>
+
+          <div className="device-push-banner mb-4">
+            <div>
+              <strong>Device pop-up alerts</strong>
+              <small>
+                {notificationsEnabled
+                  ? "Active — CampusLoop alerts pop up on your device even when closed."
+                  : isPushSupported()
+                    ? "Enable pop-up notifications so messages and approvals arrive even when the app is closed."
+                    : "Your alerts stay synced here whenever you open CampusLoop."}
+              </small>
+            </div>
+            {!notificationsEnabled && isPushSupported() && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pushRequesting}
+                onClick={() => {
+                  setPushRequesting(true);
+                  void requestAppNotifications()
+                    .then((res) => {
+                      if (res === "granted") {
+                        toast.success("Device pop-up alerts enabled");
+                      } else if (res === "denied") {
+                        toast.error("Notifications are blocked in your browser settings.");
+                      }
+                    })
+                    .finally(() => setPushRequesting(false));
+                }}
+              >
+                <Bell size={15} />
+                {pushRequesting ? "Enabling..." : "Enable device alerts"}
+              </Button>
+            )}
+          </div>
 
           <div className="university-checks mb-4">
             <label className="audience-check">
@@ -942,15 +1114,53 @@ export function PostPage({
     );
   }
 
+  const limits = getSellerEffectiveLimits(user);
+  const activeListingCount = myListings.filter(
+    (l) => (l.rawStatus ?? l.status) !== "Archived",
+  ).length;
+
   if (!editId && user.role !== "admin" && user.verificationStatus !== "verified") {
     return (
       <Shell>
         <div className="post-wrap">
-          <Link to="/dashboard" className="back-link">
-            <ArrowLeft size={15} />
-            Dashboard
-          </Link>
+          <PageBackButton fallbackTo="/dashboard" label="Back" />
           <SellerVerificationCard />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!editId && limits.requiresActivePlan) {
+    return (
+      <Shell>
+        <div className="post-wrap">
+          <PageBackButton fallbackTo="/dashboard" label="Back" />
+          <Empty
+            title="Seller plan required"
+            text={`Monthly seller plans started on ${SUBSCRIPTION_LAUNCH_LABEL}. Choose Standard, Plus, or Pro in your dashboard or contact ${SPECIAL_OFFER_PHONE} for a special offer.`}
+          >
+            <Button asChild>
+              <Link to="/dashboard">View Seller Plans</Link>
+            </Button>
+          </Empty>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!editId && activeListingCount >= limits.maxListings) {
+    return (
+      <Shell>
+        <div className="post-wrap">
+          <PageBackButton fallbackTo="/dashboard" label="Back" />
+          <Empty
+            title={`Upload limit reached (${activeListingCount}/${limits.maxListings})`}
+            text={`Your current plan allows up to ${limits.maxListings} product or service uploads. Contact us for a special offer: ${SPECIAL_OFFER_PHONE}.`}
+          >
+            <Button asChild>
+              <Link to="/dashboard">Manage listings &amp; plans</Link>
+            </Button>
+          </Empty>
         </div>
       </Shell>
     );
@@ -959,11 +1169,14 @@ export function PostPage({
   if (editId && !existing) {
     return (
       <Shell>
-        <Empty title="Listing unavailable" text="Only your own listings can be edited.">
-          <Button asChild>
-            <Link to="/dashboard">Back to dashboard</Link>
-          </Button>
-        </Empty>
+        <div className="post-wrap">
+          <PageBackButton fallbackTo="/dashboard" label="Back" />
+          <Empty title="Listing unavailable" text="Only your own listings can be edited.">
+            <Button asChild>
+              <Link to="/dashboard">Back to dashboard</Link>
+            </Button>
+          </Empty>
+        </div>
       </Shell>
     );
   }
@@ -1010,8 +1223,10 @@ export function PostPage({
       return;
     }
     const selected = Array.from(files);
-    if (draft.images.length + selected.length > 8) {
-      setError("You can attach up to 8 photos per listing.");
+    if (draft.images.length + selected.length > limits.maxImagesPerListing) {
+      setError(
+        `You can attach up to ${limits.maxImagesPerListing} image${limits.maxImagesPerListing === 1 ? "" : "s"} per listing.`,
+      );
       return;
     }
     if (selected.some((f) => !f.type.startsWith("image/") || f.type === "image/svg+xml")) {
@@ -1044,6 +1259,7 @@ export function PostPage({
       images: imageUrls,
       audience: draft.audience,
       contact: draft.contact,
+      maxImages: limits.maxImagesPerListing,
     });
   }
 
@@ -1154,10 +1370,7 @@ export function PostPage({
   return (
     <Shell>
       <div className="post-wrap">
-        <Link to="/dashboard" className="back-link">
-          <ArrowLeft size={15} />
-          Dashboard
-        </Link>
+        <PageBackButton fallbackTo="/dashboard" label="Back" />
 
         <section className="surface-panel curve-accent">
           <PageIntro
@@ -1211,7 +1424,10 @@ export function PostPage({
                     ? "Uploading optimized images..."
                     : `Add ${draft.type === "product" ? "product" : "portfolio"} photos`}
                 </strong>
-                <small>Tap to upload from your device (up to 5 MB each)</small>
+                <small>
+                  Tap to upload from your device (up to {limits.maxImagesPerListing} photos, max 5
+                  MB each)
+                </small>
                 <input
                   aria-label="Listing images"
                   className="sr-only"

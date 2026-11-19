@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "CampusLoop — Campus Marketplace",
+  "name": "CampusLoop — Ghana University Campus Marketplace",
   "short_name": "CampusLoop",
-  "description": "Discover products, services and student talent across Ghanaian university communities.",
+  "description": "CampusLoop Marketplace: Buy and sell products, services, and student essentials across Ghanaian university campuses. No account needed for buyers.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

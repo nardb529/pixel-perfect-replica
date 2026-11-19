@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, MailCheck, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { AnimatedSelect, Logo, ThemeToggle } from "./shared";
+import { AnimatedSelect, Logo, PageBackButton, ThemeToggle } from "./shared";
 import { useCampus } from "./store";
 import {
   BRAND,
@@ -28,12 +28,18 @@ export function AuthPage() {
 
   const {
     backendConfigured,
+    authLoading,
+    user,
     universityNames,
     dbUniversities,
     refreshProfile,
     triggerSellerPostAuth,
   } = useCampus();
   const navigate = useNavigate();
+
+  if (!authLoading && user) {
+    return <Navigate to={user.role === "admin" ? "/admin" : "/dashboard"} replace />;
+  }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -162,9 +168,12 @@ export function AuthPage() {
 
       <main className="auth-main">
         <div className="auth-inner surface-panel curve-accent">
-          <div className="auth-mobile-top">
-            <Logo />
-            <ThemeToggle compact />
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <PageBackButton fallbackTo="/discover" label="Back" />
+            <div className="auth-mobile-top mb-0">
+              <Logo />
+              <ThemeToggle compact />
+            </div>
           </div>
 
           {verificationPendingEmail ? (
@@ -365,7 +374,9 @@ export function AuthPage() {
                       <small className="text-xs text-muted-foreground mt-1 block">
                         {isStudent
                           ? "After sign-up you will upload your Student ID and a matching real profile photo."
-                          : "After sign-up you will upload your Ghana Card or Voter's ID and a matching real profile photo."}
+                          : "After sign-up you will upload your Ghana Card or Voter's ID and a matching real profile photo."}{" "}
+                        Documents are used strictly for verification only in accordance with Ghana’s
+                        Data Protection Act, 2012 (Act 843).
                       </small>
                     </div>
                   </>
@@ -401,8 +412,9 @@ export function AuthPage() {
               </form>
 
               <p className="auth-footnote">
-                Protected by CampusLoop Auth — by continuing you agree to our{" "}
-                <Link to="/terms">Terms</Link> &amp; <Link to="/privacy">Privacy Policy</Link>.
+                Compliant with Ghana’s Data Protection Act, 2012 (Act 843) — by continuing you agree
+                to our <Link to="/terms">Terms</Link> &amp;{" "}
+                <Link to="/privacy">Privacy Policy</Link>.
               </p>
 
               <div className="auth-browse">

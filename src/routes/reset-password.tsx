@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Logo, ThemeToggle } from "@/components/campus/shared";
+import { Logo, PageBackButton, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
 import { toUserSafeErrorMessage, validatePassword } from "@/lib/campus/data";
 import { pageHead } from "@/lib/campus/meta";
@@ -90,8 +90,11 @@ function ResetPasswordPage() {
     <div className="auth-page">
       <main className="auth-main col-span-2">
         <div className="auth-inner surface-panel curve-accent">
-          <div className="flex items-center justify-between mb-6">
-            <Logo />
+          <div className="flex items-center justify-between gap-2 mb-6">
+            <div className="flex items-center gap-2">
+              <PageBackButton fallbackTo="/auth" label="Back" />
+              <Logo />
+            </div>
             <ThemeToggle compact />
           </div>
 

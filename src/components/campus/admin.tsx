@@ -39,6 +39,7 @@ import {
   Shell,
   Empty,
   HeroAmbient,
+  PageBackButton,
   PagePendingFallback,
   AnimatedSelect,
   SectionTitle,
@@ -335,6 +336,7 @@ export function AdminPage() {
   if (!isAdminUser) {
     return (
       <Shell>
+        <PageBackButton fallbackTo="/dashboard" label="Back" />
         <section className="surface-panel hero-panel curve-accent">
           <HeroAmbient />
           <div className="dashboard-top">
@@ -699,6 +701,7 @@ export function AdminPage() {
 
   return (
     <Shell>
+      <PageBackButton fallbackTo="/dashboard" label="Back" />
       {/* Executive Command Header */}
       <section className="surface-panel hero-panel admin-command-hero curve-accent">
         <HeroAmbient />

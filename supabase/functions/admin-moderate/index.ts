@@ -27,6 +27,34 @@ type AdminAction =
     }
   | { action: "resolve_report"; reportId: string; status: string; note?: string };
 
+async function triggerWebPush(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  userIds: string[],
+  title: string,
+  message: string,
+  url = "/dashboard",
+) {
+  if (!userIds.length) return;
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/push-send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        userIds,
+        title,
+        message,
+        url,
+      }),
+    });
+  } catch (err) {
+    console.warn("Web push dispatch skipped:", err);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -151,13 +179,25 @@ Deno.serve(async (req: Request) => {
       });
       if (logErr) throw new Error(logErr.message);
 
+      const notifTitle =
+        payload.status === "Active" ? "Listing approved" : "Listing status updated";
+      const notifMessage = `"${listing.title}" is now ${payload.status}.${payload.note ? ` Note: ${payload.note}` : ""}`;
       const { error: notifErr } = await adminClient.from("notifications").insert({
         user_id: listing.seller_id,
-        title: payload.status === "Active" ? "Listing approved" : "Listing status updated",
-        message: `"${listing.title}" is now ${payload.status}.${payload.note ? ` Note: ${payload.note}` : ""}`,
+        title: notifTitle,
+        message: notifMessage,
         notification_type: payload.status === "Rejected" ? "listing_rejected" : "listing_approved",
       });
       if (notifErr) throw new Error(notifErr.message);
+
+      await triggerWebPush(
+        supabaseUrl,
+        serviceRoleKey,
+        [listing.seller_id],
+        notifTitle,
+        notifMessage,
+        "/dashboard",
+      );
     } else if (payload.action === "toggle_featured") {
       if (!UUID_REGEX.test(payload.listingId)) {
         return new Response(JSON.stringify({ error: "Invalid listingId" }), {
@@ -273,21 +313,33 @@ Deno.serve(async (req: Request) => {
       });
       if (logErr) throw new Error(logErr.message);
 
+      const notifTitle =
+        payload.status === "verified"
+          ? "Seller account verified"
+          : payload.status === "pending"
+            ? "Verification under review"
+            : "Verification needs another photo";
+      const notifMessage =
+        payload.status === "verified"
+          ? "Your CampusLoop seller verification is approved. You can now post products and services."
+          : cleanNote || `Your verification status was updated to ${payload.status}.`;
+
       const { error: notifErr } = await adminClient.from("notifications").insert({
         user_id: payload.userId,
-        title:
-          payload.status === "verified"
-            ? "Seller account verified"
-            : payload.status === "pending"
-              ? "Verification under review"
-              : "Verification needs another photo",
-        message:
-          payload.status === "verified"
-            ? "Your CampusLoop seller verification is approved. You can now post products and services."
-            : cleanNote || `Your verification status was updated to ${payload.status}.`,
+        title: notifTitle,
+        message: notifMessage,
         notification_type: "account_update",
       });
       if (notifErr) throw new Error(notifErr.message);
+
+      await triggerWebPush(
+        supabaseUrl,
+        serviceRoleKey,
+        [payload.userId],
+        notifTitle,
+        notifMessage,
+        "/dashboard",
+      );
     } else {
       return new Response(JSON.stringify({ error: "Unsupported moderation action" }), {
         status: 400,

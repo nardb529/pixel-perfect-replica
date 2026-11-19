@@ -12,6 +12,7 @@ export const Route = createFileRoute("/dashboard")({
     pageHead(
       "Your seller dashboard",
       "Manage your campus listings and see interest in your products and services.",
+      { path: "/dashboard", noIndex: true },
     ),
   component: DashboardRouteComponent,
 });

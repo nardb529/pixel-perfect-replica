@@ -305,11 +305,11 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     }
   });
 
-  it("adapts viewport safe areas, elevates floating navbar, and increases dock tap target size", () => {
-    expect(stylesCss).toContain("bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));");
-    expect(stylesCss).toContain("max-width: 368px;\n    height: 68px;");
+  it("adapts viewport safe areas, anchors floating navbar at very bottom, and bolds dock buttons", () => {
+    expect(stylesCss).toContain("bottom: max(4px, env(safe-area-inset-bottom));");
+    expect(stylesCss).toContain("max-width: 392px;\n    height: 70px;");
     expect(stylesCss).toContain(
-      "padding: 10px max(12px, env(safe-area-inset-right)) calc(134px + env(safe-area-inset-bottom))",
+      "padding: 10px max(12px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom))",
     );
     expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
   });

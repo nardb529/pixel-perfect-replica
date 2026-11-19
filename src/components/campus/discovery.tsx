@@ -26,6 +26,7 @@ import {
   Empty,
   BrowseLink,
   PageIntro,
+  PageBackButton,
   AnimatedSelect,
 } from "./shared";
 import { filterListings, type Listing } from "@/lib/campus/data";
@@ -36,7 +37,7 @@ const shortcuts = [
   { name: "Fashion", icon: ShoppingBag, tone: "violet" },
   { name: "Books & Academics", label: "Books", icon: GraduationCap, tone: "blue" },
   { name: "Food & Groceries", label: "Food", icon: Coffee, tone: "amber" },
-  { name: "Hair & Beauty", label: "Beauty", icon: Scissors, tone: "rose" },
+  { name: "Beauty", label: "Beauty", icon: Scissors, tone: "rose" },
   { name: "Photography", label: "Photos", icon: Camera, tone: "cyan" },
   { name: "Hostel Essentials", label: "Hostel", icon: Sofa, tone: "emerald" },
   { name: "Technology & Repairs", label: "Repairs", icon: Cpu, tone: "slate" },
@@ -61,7 +62,11 @@ export function DiscoverPage() {
   const [remoteSuggestions, setRemoteSuggestions] = useState<
     Array<{ id: string; title: string; type: "product" | "service" }>
   >([]);
+  const [remoteSearchResults, setRemoteSearchResults] = useState<Listing[] | null>(null);
+  const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const navigate = useNavigate();
+
+  const searching = Boolean(query.trim()) || category !== "All";
 
   useEffect(() => {
     function handleDiscoverRefresh() {
@@ -92,6 +97,42 @@ export function DiscoverPage() {
     };
   }, [backendConfigured, schemaReady, query]);
 
+  useEffect(() => {
+    if (!backendConfigured || !schemaReady || !searching) {
+      setRemoteSearchResults(null);
+      setRemoteSearchLoading(false);
+      return;
+    }
+    let active = true;
+    setRemoteSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void listingService
+        .searchListings({
+          universityFilter: university === "All Universities" ? null : university,
+          categoryFilter: category === "All" ? null : category,
+          searchQuery: query.trim() || null,
+          sort: query.trim() ? "relevant" : "recent",
+          limit: 48,
+          offset: 0,
+        })
+        .then(({ items }) => {
+          if (!active) return;
+          setRemoteSearchResults(items);
+          setRemoteSearchLoading(false);
+        })
+        .catch(() => {
+          if (!active) return;
+          setRemoteSearchResults(null);
+          setRemoteSearchLoading(false);
+        });
+    }, 220);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [backendConfigured, schemaReady, searching, university, category, query]);
+
   const suggestions = useMemo(() => {
     if (backendConfigured && schemaReady && remoteSuggestions.length > 0) return remoteSuggestions;
     const q = query.trim().toLowerCase();
@@ -102,11 +143,11 @@ export function DiscoverPage() {
       .map((l) => ({ id: l.id, title: l.title, type: l.type }));
   }, [backendConfigured, schemaReady, remoteSuggestions, query, listings]);
 
-  const results = useMemo(
+  const localResults = useMemo(
     () => filterListings(listings, university, query, undefined, category),
     [listings, university, query, category],
   );
-  const searching = Boolean(query.trim()) || category !== "All";
+  const results = searching && remoteSearchResults !== null ? remoteSearchResults : localResults;
   const services = useMemo(
     () => filterListings(listings, university, "", "service").slice(0, 4),
     [listings, university],
@@ -131,6 +172,7 @@ export function DiscoverPage() {
 
   return (
     <Shell>
+      <PageBackButton fallbackTo="/" label="Back" />
       <section className="surface-panel hero-panel curve-accent">
         <HeroAmbient />
 
@@ -203,7 +245,7 @@ export function DiscoverPage() {
           )}
         </SectionTitle>
 
-        {listingsLoading && results.length === 0 ? (
+        {(listingsLoading || remoteSearchLoading) && results.length === 0 ? (
           <div className="listing-grid">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="route-skeleton-card" />
@@ -488,6 +530,7 @@ export function BrowsePage({
 
   return (
     <Shell>
+      <PageBackButton fallbackTo="/discover" label="Back" />
       <section className="surface-panel hero-panel browse-panel curve-accent">
         <HeroAmbient />
 

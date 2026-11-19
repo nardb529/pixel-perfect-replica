@@ -1,0 +1,1183 @@
+# PROJECT: CAMPUSLOOP
+## COMPLETE BACKEND DEVELOPMENT, DATABASE INTEGRATION AND PRODUCTION IMPLEMENTATION
+
+Act as a senior full-stack engineer, backend architect, PostgreSQL database engineer, SaaS security specialist and marketplace platform developer.
+
+Your task is to transform the existing CampusLoop application from a frontend prototype into a fully functional, secure and production-ready multi-university marketplace.
+
+IMPORTANT: THIS IS AN EXISTING PROJECT.
+
+The frontend has already been designed and developed using Lovable.
+
+Do not unnecessarily redesign, rebuild or replace the existing frontend.
+
+First inspect the complete existing codebase, understand its architecture, pages, components, navigation, UI/UX, design system and existing functionality.
+
+Preserve the existing:
+- Branding.
+- Colour system.
+- Typography.
+- Animations.
+- Layouts.
+- Responsive behaviour.
+- Navigation.
+- User experience.
+- Existing application structure.
+
+Your primary responsibility is to implement the complete backend, database, authentication, file storage, marketplace logic, analytics, security and frontend-backend integration.
+
+Do not simply create a new application.
+
+==================================================
+1. PRODUCT DEFINITION
+==================================================
+
+CampusLoop is a Ghanaian university marketplace and student services discovery platform.
+
+It connects:
+
+1. Students looking to purchase products.
+2. Students selling products.
+3. Students offering services.
+4. Businesses serving university communities.
+
+The platform supports multiple universities in Ghana.
+
+Users should be able to discover products and services based on their selected university or browse listings across all supported universities.
+
+CampusLoop is NOT an e-commerce payment platform.
+
+CRITICAL BUSINESS MODEL REQUIREMENTS:
+
+- Do not implement payments.
+- Do not implement checkout.
+- Do not implement shopping carts.
+- Do not implement order processing.
+- Do not implement transaction commissions.
+- Do not collect money on behalf of sellers.
+- Do not charge commissions on transactions.
+- Do not create payment gateways.
+
+CampusLoop only connects buyers with sellers and service providers.
+
+Buyers contact sellers directly through their preferred contact methods.
+
+The platform should remain simple, lightweight, visually attractive and easy to operate.
+
+==================================================
+2. TECHNOLOGY STACK
+==================================================
+
+Use:
+
+FRONTEND:
+- Existing React application.
+- TypeScript.
+- Existing Tailwind CSS implementation.
+- Existing components and routing.
+
+BACKEND:
+- Supabase.
+
+DATABASE:
+- PostgreSQL hosted by Supabase.
+
+AUTHENTICATION:
+- Supabase Auth.
+
+FILE STORAGE:
+- Supabase Storage.
+
+SERVER-SIDE LOGIC:
+- Supabase Edge Functions where necessary.
+- PostgreSQL functions for appropriate database operations.
+
+HOSTING:
+- Maintain Vercel compatibility.
+
+Do not introduce an unnecessary second backend.
+
+Do not use localStorage as the permanent database.
+
+Use local state or browser storage only for temporary interface preferences, anonymous saved listings or other appropriate client-side functionality.
+
+==================================================
+3. FIRST TASK: AUDIT THE EXISTING CODEBASE
+==================================================
+
+Inspect the entire existing application.
+
+Identify:
+
+- All frontend pages.
+- All reusable components.
+- Current mock data.
+- Product listing functionality.
+- Service listing functionality.
+- Authentication screens.
+- Seller dashboard.
+- Listing creation forms.
+- University filtering.
+- Search functionality.
+- Listing detail pages.
+- Profile pages.
+- Admin screens.
+- Existing TypeScript interfaces.
+
+Create a mapping:
+
+FRONTEND FEATURE → DATABASE TABLE → REQUIRED BACKEND OPERATION.
+
+Identify missing functionality.
+
+Preserve existing functionality and visual design.
+
+Do not stop after the audit.
+
+Proceed with implementation.
+
+==================================================
+4. SUPABASE CONFIGURATION
+==================================================
+
+Connect the application to Supabase.
+
+Use:
+
+VITE_SUPABASE_URL=
+
+VITE_SUPABASE_ANON_KEY=
+
+Create a reusable Supabase client.
+
+Never expose the service-role key in frontend code.
+
+Use secure server-side functions for privileged operations.
+
+Create a centralized data access layer.
+
+Organize backend services into separate modules:
+
+- authenticationService
+- profileService
+- universityService
+- listingService
+- categoryService
+- favoriteService
+- analyticsService
+- reportService
+- notificationService
+- adminService
+
+Do not scatter database queries throughout frontend components.
+
+If configuration credentials are unavailable, prepare the integration and clearly identify the missing configuration.
+
+Never pretend a backend connection is working if it has not been configured and tested.
+
+==================================================
+5. AUTHENTICATION ARCHITECTURE
+==================================================
+
+This requirement is fundamental.
+
+CampusLoop has two distinct user experiences.
+
+A. BUYERS
+
+Buyers must NOT be forced to register.
+
+They should be able to:
+
+- Open the application.
+- Pass the launch screen.
+- Enter the marketplace.
+- Browse listings.
+- Search.
+- Filter by university.
+- View listing details.
+- View seller profiles.
+- Contact sellers.
+- Share listings.
+
+No authentication requirement for these activities.
+
+Implement anonymous browsing.
+
+Allow temporary saved listings using browser storage if the buyer has not registered.
+
+B. SELLERS AND SERVICE PROVIDERS
+
+They must register or log in before accessing the management dashboard.
+
+Implement real Supabase authentication.
+
+Features:
+
+- Sign up.
+- Login.
+- Logout.
+- Email verification.
+- Forgot password.
+- Password reset.
+- Persistent sessions.
+- Protected dashboard routes.
+- Authentication state management.
+
+Support account types:
+
+- Product Seller.
+- Service Provider.
+- Both.
+
+A user can offer both products and services.
+
+Do not create completely separate authentication systems for sellers and service providers.
+
+They should use one account system with appropriate capabilities.
+
+C. USER PROFILES
+
+Create profiles table.
+
+Fields:
+
+- id (linked to auth.users)
+- full_name
+- username
+- email
+- phone_number
+- whatsapp_number
+- profile_image
+- bio
+- account_type
+- primary_university_id
+- verification_status
+- created_at
+- updated_at
+
+Ensure usernames are unique.
+
+Allow users to update their profiles.
+
+Do not expose private account information publicly.
+
+==================================================
+6. UNIVERSITY MANAGEMENT
+==================================================
+
+CampusLoop must support universities across Ghana.
+
+Create a universities table.
+
+Fields:
+
+- id
+- university_name
+- short_name
+- slug
+- logo_url
+- location
+- region
+- description
+- is_active
+- created_at
+
+Include initial universities:
+
+- Kwame Nkrumah University of Science and Technology.
+- University of Ghana.
+- University of Cape Coast.
+- University of Professional Studies, Accra.
+- University of Education, Winneba.
+- University for Development Studies.
+- University of Mines and Technology.
+- University of Energy and Natural Resources.
+- Ghana Communication Technology University.
+- University of Health and Allied Sciences.
+- University of Environment and Sustainable Development.
+- Ghana Institute of Management and Public Administration.
+- Accra Technical University.
+- Kumasi Technical University.
+- Takoradi Technical University.
+- Other relevant accredited institutions.
+
+Make university records manageable through the admin dashboard.
+
+Do not hardcode the university list into frontend components.
+
+The frontend must retrieve universities from the database.
+
+Support future additions without requiring application code changes.
+
+==================================================
+7. USER UNIVERSITY ASSOCIATIONS
+==================================================
+
+Create a user_universities table.
+
+Fields:
+
+- id
+- user_id
+- university_id
+- affiliation_type
+- is_primary
+- created_at
+
+A seller or service provider may be associated with more than one university.
+
+Affiliation types may include:
+
+- Student.
+- Alumni.
+- Business.
+- Service Provider.
+- Other.
+
+Allow users to select their primary university and additional affiliations.
+
+Do not force every seller to operate exclusively within one university.
+
+==================================================
+8. CATEGORIES
+==================================================
+
+Create database-managed product and service categories.
+
+PRODUCT CATEGORIES:
+
+- Electronics.
+- Fashion.
+- Books and Academics.
+- Food and Groceries.
+- Beauty.
+- Hostel Essentials.
+- Sports.
+- Accessories.
+- Home and Living.
+- Others.
+
+SERVICE CATEGORIES:
+
+- Graphic Design.
+- Photography.
+- Hair and Beauty.
+- Technology and Repairs.
+- Tutoring.
+- Laundry.
+- Printing.
+- Food Services.
+- Transport.
+- Cleaning.
+- Events.
+- Others.
+
+Create a categories table.
+
+Fields:
+
+- id
+- name
+- slug
+- category_type
+- icon
+- description
+- is_active
+- created_at
+
+Allow administrators to add, edit, disable and reorder categories.
+
+==================================================
+9. CORE LISTINGS DATABASE
+==================================================
+
+Create a central listings table.
+
+Fields:
+
+- id
+- seller_id
+- listing_type
+- title
+- slug
+- description
+- category_id
+- price
+- price_type
+- currency
+- status
+- condition
+- location
+- is_featured
+- published_at
+- expires_at
+- created_at
+- updated_at
+
+Listing types:
+
+- Product.
+- Service.
+
+Price types:
+
+- Fixed.
+- Starting from.
+- Price range.
+- Negotiable.
+- Free.
+
+Currency default:
+
+GHS.
+
+Listing statuses:
+
+- Draft.
+- Active.
+- Paused.
+- Sold.
+- Unavailable.
+- Rejected.
+- Archived.
+
+A listing must always belong to its creator.
+
+Implement appropriate database constraints.
+
+Create listing_images table.
+
+Fields:
+
+- id
+- listing_id
+- image_url
+- display_order
+- created_at
+
+Allow multiple images per listing.
+
+Implement image ordering and removal.
+
+PRODUCT-SPECIFIC DATA:
+
+Create product_details table.
+
+Fields:
+
+- listing_id
+- condition
+- brand
+- stock_status
+- additional_attributes
+
+SERVICE-SPECIFIC DATA:
+
+Create service_details table.
+
+Fields:
+
+- listing_id
+- starting_price
+- duration
+- service_area
+- delivery_method
+- additional_attributes
+
+Keep product and service data appropriately separated.
+
+==================================================
+10. LISTING UNIVERSITY TARGETING
+==================================================
+
+This is one of the most important CampusLoop features.
+
+Create listing_universities table.
+
+Fields:
+
+- id
+- listing_id
+- university_id
+- created_at
+
+Each listing must support three audience options:
+
+1. One University.
+2. Multiple Universities.
+3. All Universities.
+
+A listing may be available to one or more universities.
+
+When a user selects KNUST:
+
+Display:
+- Listings specifically targeted at KNUST.
+- Listings available across all universities.
+
+When a user selects University of Ghana:
+
+Display:
+- Listings specifically targeted at UG.
+- Listings available across all universities.
+
+When a user selects All Universities:
+
+Display listings across all active universities.
+
+Do not display listings from unrelated universities when a user selects a specific university.
+
+Ensure the filtering logic works consistently across:
+
+- Discover.
+- Products.
+- Services.
+- Search results.
+- Category pages.
+- Featured listings.
+
+Create efficient database queries and indexes.
+
+==================================================
+11. LISTING CREATION AND MANAGEMENT
+==================================================
+
+Connect the existing seller dashboard to the database.
+
+Implement:
+
+- Create product listing.
+- Create service listing.
+- Edit listing.
+- Delete or archive listing.
+- Pause listing.
+- Reactivate listing.
+- Mark product as sold.
+- Mark service as unavailable.
+- Upload images.
+- Remove images.
+- Select categories.
+- Select university audiences.
+- Preview listing before publishing.
+
+Validate all required fields.
+
+Ensure prices are valid.
+
+Allow optional pricing for services.
+
+Ensure sellers can only edit and delete their own listings.
+
+Do not allow users to modify another seller's records by manipulating frontend requests.
+
+==================================================
+12. SEARCH AND DISCOVERY
+==================================================
+
+Implement actual database-powered search.
+
+Search fields:
+
+- Listing title.
+- Description.
+- Category.
+- Seller username.
+- Relevant university.
+
+Support:
+
+- Search suggestions.
+- Search by category.
+- Search by university.
+- Product filtering.
+- Service filtering.
+- Price range.
+- Listing status.
+- Recently posted.
+- Relevant sorting.
+- Featured listings.
+
+Use PostgreSQL search capabilities and appropriate indexes.
+
+Avoid loading the entire listings table into the browser.
+
+Implement pagination or efficient infinite scrolling.
+
+Make search responsive.
+
+==================================================
+13. SELLER AND SERVICE PROVIDER PROFILES
+==================================================
+
+Implement public seller profiles.
+
+Display:
+
+- Profile image.
+- Display name.
+- University affiliations.
+- Short biography.
+- Active listings.
+- Products.
+- Services.
+- Contact options.
+- Verification badge where applicable.
+
+Do not expose private account data.
+
+A public profile should only display information intentionally made public.
+
+Allow sellers to manage their profile information.
+
+==================================================
+14. CONTACT AND COMMUNICATION
+==================================================
+
+CampusLoop does not process transactions.
+
+Contact is the primary conversion mechanism.
+
+Support:
+
+- WhatsApp contact.
+- Phone contact.
+- Other approved contact methods.
+
+Implement WhatsApp click-to-chat links.
+
+Do not expose private contact information unnecessarily.
+
+Where possible, provide controlled contact actions.
+
+When someone clicks Contact Seller or Contact Provider:
+
+- Record the listing ID.
+- Record the seller ID.
+- Record the contact method.
+- Record the timestamp.
+- Record the university context where available.
+
+Avoid storing unnecessary personal information about anonymous buyers.
+
+Do not automatically send messages on behalf of buyers.
+
+Do not build an internal chat system in the initial version.
+
+==================================================
+15. SAVED LISTINGS
+==================================================
+
+Implement favorites for authenticated users.
+
+Create favorites table.
+
+Fields:
+
+- id
+- user_id
+- listing_id
+- created_at
+
+Support:
+
+- Save listing.
+- Remove saved listing.
+- View saved listings.
+
+For anonymous buyers, allow temporary saved listings using browser storage.
+
+Do not force registration merely to browse or contact sellers.
+
+==================================================
+16. ANALYTICS AND LISTING PERFORMANCE
+==================================================
+
+Create listing_views table.
+
+Fields:
+
+- id
+- listing_id
+- seller_id
+- university_id
+- viewed_at
+- visitor_session_id
+- source
+
+Create contact_clicks table.
+
+Fields:
+
+- id
+- listing_id
+- seller_id
+- contact_method
+- university_id
+- clicked_at
+- visitor_session_id
+
+Implement reasonable deduplication and abuse prevention.
+
+Avoid collecting unnecessary personal information.
+
+The seller dashboard should display:
+
+- Total listing views.
+- Contact clicks.
+- Saved listings.
+- Most viewed listings.
+- Best-performing listings.
+- Recent activity.
+
+Allow date filters:
+
+- Today.
+- Last 7 days.
+- Last 30 days.
+- All time.
+
+All analytics must come from actual database records.
+
+Do not generate fake popularity figures.
+
+Create appropriate aggregate queries.
+
+Do not expose individual buyer browsing histories to sellers.
+
+==================================================
+17. REPORTING AND MODERATION
+==================================================
+
+Create reports table.
+
+Fields:
+
+- id
+- reporter_id (nullable for anonymous reports if supported)
+- listing_id
+- reported_user_id
+- reason
+- description
+- status
+- reviewed_by
+- reviewed_at
+- created_at
+
+Report reasons:
+
+- Scam or suspicious activity.
+- Misleading listing.
+- Inappropriate content.
+- Duplicate listing.
+- Prohibited product or service.
+- Other.
+
+Implement a basic moderation workflow.
+
+Administrators should be able to:
+
+- Review reports.
+- Suspend listings.
+- Restore listings.
+- Remove inappropriate content.
+- Suspend accounts.
+- View moderation history.
+
+Do not allow ordinary users to access administrative functionality.
+
+Enforce administrative authorization on the backend.
+
+==================================================
+18. ADMIN DASHBOARD
+==================================================
+
+Connect the existing admin interface to real data.
+
+Features:
+
+- Total registered sellers/providers.
+- Total active listings.
+- Total products.
+- Total services.
+- University distribution.
+- Recent listings.
+- Reported listings.
+- Suspended accounts.
+- Listing activity.
+- Contact engagement.
+
+University management:
+
+- Add university.
+- Edit university.
+- Activate/deactivate university.
+- Upload university logo.
+
+Category management:
+
+- Add category.
+- Edit category.
+- Disable category.
+
+Moderation:
+
+- Review reports.
+- Suspend listings.
+- Restore listings.
+- Suspend users.
+
+Feature management:
+
+- Feature selected listings.
+- Remove featured status.
+
+All privileged actions must be secured.
+
+==================================================
+19. SUBSCRIPTION AND MONETIZATION PREPARATION
+==================================================
+
+CampusLoop should initially operate as a free marketplace.
+
+Prepare the architecture for future monetization without complicating the launch.
+
+Potential future revenue sources:
+
+- Featured listings.
+- Promoted products.
+- Promoted services.
+- Optional seller subscriptions.
+- University or business advertising.
+- Sponsored campus collections.
+
+Do not introduce transaction commissions.
+
+Do not implement checkout or payment processing.
+
+Create a basic advertising and promotion architecture only if it does not delay the core marketplace.
+
+Keep pricing and promotion configurations manageable through the admin interface.
+
+Do not display fake advertisements or fake sponsored listings.
+
+==================================================
+20. STORAGE
+==================================================
+
+Create Supabase Storage buckets:
+
+- profile-images
+- listing-images
+- university-logos
+
+Implement:
+
+- Image type validation.
+- File size limits.
+- Upload permissions.
+- Image deletion.
+- Image optimization.
+- Appropriate public/private access.
+
+Listing images can be publicly viewable.
+
+Private account information must remain protected.
+
+Users should only be able to manage images associated with their own profiles and listings.
+
+==================================================
+21. DATABASE SECURITY
+==================================================
+
+Security is a critical requirement.
+
+Implement PostgreSQL Row Level Security on all appropriate tables.
+
+Policies must ensure:
+
+PUBLIC USERS:
+- Can view active and approved listings.
+- Can view public seller profiles.
+- Can view active universities and categories.
+- Cannot access private seller account information.
+- Cannot create or modify listings.
+
+AUTHENTICATED SELLERS:
+- Can create listings.
+- Can edit their own listings.
+- Can archive their own listings.
+- Can manage their own profile.
+- Can view their own listing analytics.
+- Cannot modify other sellers' listings.
+
+ADMINISTRATORS:
+- Can perform authorized moderation.
+- Can manage universities.
+- Can manage categories.
+- Can manage users.
+- Can access administrative analytics.
+
+Important:
+
+Never rely on frontend route protection alone.
+
+Never trust seller_id or user_id supplied by the frontend without validating the authenticated user.
+
+Do not allow users to assign themselves administrator permissions.
+
+Use secure database functions and Edge Functions where appropriate.
+
+Do not expose the service-role key.
+
+Implement rate limiting or abuse controls for sensitive public operations.
+
+Protect against:
+
+- Unauthorized listing modifications.
+- Spam listings.
+- Excessive contact-click submissions.
+- Malicious file uploads.
+- Unauthorized administrative actions.
+- Enumeration of private user data.
+
+==================================================
+22. NOTIFICATIONS
+==================================================
+
+Prepare notification infrastructure.
+
+Create notifications table.
+
+Fields:
+
+- id
+- user_id
+- title
+- message
+- notification_type
+- is_read
+- created_at
+
+Potential notifications:
+
+- Listing published.
+- Listing rejected.
+- Listing expiring soon.
+- Listing approved.
+- Account updates.
+- Important platform announcements.
+
+Do not implement excessive notifications.
+
+Allow users to manage notification preferences.
+
+Email notifications can be connected through a secure email provider later.
+
+==================================================
+23. PERFORMANCE AND DATABASE COST CONTROL
+==================================================
+
+CampusLoop should remain affordable to operate.
+
+Requirements:
+
+- One shared database for all universities.
+- Efficient indexed queries.
+- Pagination.
+- Lazy-loaded images.
+- Image compression.
+- Avoid unnecessary database requests.
+- Avoid unnecessary real-time subscriptions.
+- Efficient analytics queries.
+- Avoid downloading entire tables.
+- Use caching where appropriate.
+
+Do not create separate databases for universities.
+
+Do not introduce expensive infrastructure without a clear need.
+
+The platform should be capable of growing from a small initial student community to multiple universities.
+
+==================================================
+24. TESTING
+==================================================
+
+Do not declare the application complete until the following tests pass.
+
+AUTHENTICATION:
+- Seller registration works.
+- Seller login works.
+- Logout works.
+- Password reset works.
+- Buyers can browse without registration.
+
+LISTINGS:
+- Sellers can create products.
+- Sellers can create services.
+- Images upload correctly.
+- Listings can be edited.
+- Listings can be archived.
+- Sellers cannot edit other sellers' listings.
+
+UNIVERSITY FILTERING:
+- KNUST-specific listings appear under KNUST.
+- UG-specific listings appear under UG.
+- All-university listings appear under every university.
+- All-university browsing displays listings from all active universities.
+- Listings do not appear in unrelated university-specific results.
+
+SEARCH:
+- Search works.
+- Category filters work.
+- Price filters work.
+- Sorting works.
+- Pagination works.
+
+CONTACT:
+- WhatsApp links work.
+- Phone contact works.
+- Contact clicks are recorded.
+- Analytics display accurate figures.
+
+SECURITY:
+- Anonymous users cannot create listings.
+- Unauthorized users cannot modify listings.
+- Seller data remains protected.
+- Users cannot become administrators through frontend manipulation.
+- Private contact information is not exposed unnecessarily.
+
+ADMIN:
+- Moderation works.
+- University management works.
+- Category management works.
+- Report management works.
+
+==================================================
+25. PRODUCTION DEPLOYMENT
+==================================================
+
+Prepare the project for real deployment.
+
+Configure:
+
+- Production Supabase project.
+- Database migrations.
+- RLS policies.
+- Storage buckets.
+- Authentication settings.
+- Email verification.
+- Password recovery.
+- Vercel environment variables.
+- Production domain configuration.
+- Error monitoring.
+- Database backup strategy.
+- Usage monitoring.
+
+Create a clear deployment checklist.
+
+Never commit secrets to GitHub.
+
+Never use development credentials in production.
+
+==================================================
+26. IMPLEMENTATION ORDER
+==================================================
+
+Follow this implementation sequence.
+
+PHASE 1:
+Audit existing application and establish backend architecture.
+
+PHASE 2:
+Configure Supabase and authentication.
+
+PHASE 3:
+Create database schema and RLS policies.
+
+PHASE 4:
+Implement user profiles and university management.
+
+PHASE 5:
+Implement categories and product/service listings.
+
+PHASE 6:
+Implement listing creation, editing and image storage.
+
+PHASE 7:
+Implement search, filtering and university targeting.
+
+PHASE 8:
+Implement seller profiles and contact functionality.
+
+PHASE 9:
+Implement favorites and listing analytics.
+
+PHASE 10:
+Implement administration and moderation.
+
+PHASE 11:
+Connect all frontend screens to real backend data.
+
+PHASE 12:
+Perform security, functional and performance testing.
+
+Do not skip security testing.
+
+Do not replace actual functionality with temporary mock implementations.
+
+==================================================
+27. FINAL DELIVERABLES
+==================================================
+
+At completion, provide:
+
+1. Complete database schema.
+2. SQL migration files.
+3. RLS policies.
+4. Supabase configuration instructions.
+5. Authentication implementation.
+6. Storage configuration.
+7. Edge Functions.
+8. Frontend integration.
+9. Admin functionality.
+10. Testing results.
+11. Security assessment.
+12. Deployment instructions.
+13. Environment variable documentation.
+14. Remaining configuration requirements.
+
+Clearly distinguish between:
+
+- Fully implemented features.
+- Features requiring external configuration.
+- Features not yet implemented.
+- Features that have passed testing.
+
+Do not claim production readiness without evidence.
+
+FINAL PRODUCT REQUIREMENT:
+
+CampusLoop must be a real, operational multi-university marketplace.
+
+Buyers must be able to browse without registering.
+
+Sellers and service providers must register before accessing their dashboards.
+
+Listings must be stored in a real PostgreSQL database.
+
+University filtering must work correctly.
+
+Images must upload and display correctly.
+
+Contact actions must work.
+
+Seller analytics must reflect real engagement.
+
+Administrators must be able to moderate the platform.
+
+There must be NO payment processing, NO checkout and NO transaction commissions.
+
+Keep the application simple, beautiful, fast and affordable to operate.
+
+Begin by inspecting the existing project and then implement the backend systematically.

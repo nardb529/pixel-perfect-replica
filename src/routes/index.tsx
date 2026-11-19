@@ -10,16 +10,18 @@ import { pageHead } from "@/lib/campus/meta";
 export const Route = createFileRoute("/")({
   head: () =>
     pageHead(
-      "Your campus. Your loop.",
-      "Discover products, services and student talent across Ghanaian university communities.",
+      "Ghana University Campus Marketplace",
+      "Buy and sell student products and campus services across KNUST, UG, UCC, UDS, UENR, and every university in Ghana. Buyers need no account.",
     ),
   component: Welcome,
 });
 
 function Welcome() {
-  const { triggerBuyerInstallPrompt } = useCampus();
+  const { triggerBuyerInstallPrompt, user, authLoading } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
+  const sellDestination =
+    !authLoading && user ? (user.role === "admin" ? "/admin" : "/post") : "/auth";
 
   useEffect(() => {
     void router.preloadRoute({ to: "/discover" }).catch(() => undefined);
@@ -94,7 +96,7 @@ function Welcome() {
             {BRAND}
             <span>.</span>
           </h1>
-          <p className="launch-tagline">Your campus. Your loop.</p>
+          <p className="launch-tagline">Ghana’s university campus marketplace.</p>
         </div>
       </div>
 
@@ -104,13 +106,13 @@ function Welcome() {
           <ArrowRight size={18} />
         </Button>
         <Button variant="outline" size="lg" className="launch-secondary" asChild>
-          <Link to="/auth">
+          <Link to={sellDestination}>
             Sell or Offer a Service
             <ArrowUpRight size={17} />
           </Link>
         </Button>
         <div className="launch-hint-pill">
-          <span>Browse freely without an account</span>
+          <span>Buyers need no account — browse &amp; contact sellers free</span>
         </div>
       </div>
     </div>

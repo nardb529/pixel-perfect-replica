@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   ArrowUpRight,
   ArrowRight,
   MapPin,
@@ -538,7 +539,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
               >
                 <span className="dock-icon-wrap">
-                  <n.icon size={22} strokeWidth={active ? 2.3 : 1.9} />
+                  <n.icon size={23} strokeWidth={active ? 2.85 : 2.35} />
                 </span>
                 {active && <span className="dock-active-dot" aria-hidden="true" />}
               </Link>
@@ -553,7 +554,7 @@ export function Shell({ children }: { children: ReactNode }) {
             title="Post a listing"
           >
             <span className="dock-post-orb">
-              <Plus size={25} strokeWidth={2.5} />
+              <Plus size={26} strokeWidth={2.9} />
             </span>
           </button>
 
@@ -570,7 +571,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
               >
                 <span className="dock-icon-wrap">
-                  <n.icon size={22} strokeWidth={active ? 2.3 : 1.9} />
+                  <n.icon size={23} strokeWidth={active ? 2.85 : 2.35} />
                   {showSavedDot && <span className="dock-badge" aria-hidden="true" />}
                 </span>
                 {active && <span className="dock-active-dot" aria-hidden="true" />}
@@ -580,6 +581,44 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </nav>
     </div>
+  );
+}
+
+export function PageBackButton({
+  fallbackTo = "/discover",
+  label = "Back",
+  className = "",
+}: {
+  fallbackTo?: "/discover" | "/products" | "/services" | "/profile" | "/dashboard" | "/auth" | "/";
+  label?: string;
+  className?: string;
+}) {
+  const navigate = useNavigate();
+  const router = useRouter();
+
+  function handleBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      const historyApi = (router as { history?: { back?: () => void } }).history;
+      if (typeof historyApi?.back === "function") {
+        historyApi.back();
+        return;
+      }
+      window.history.back();
+      return;
+    }
+    navigate({ to: fallbackTo });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleBack}
+      className={`page-back-btn ${className}`.trim()}
+      aria-label={label}
+    >
+      <ArrowLeft size={16} strokeWidth={2.25} aria-hidden="true" />
+      <span>{label}</span>
+    </button>
   );
 }
 

@@ -10,8 +10,9 @@ const DetailPage = lazy(() =>
 export const Route = createFileRoute("/listing/$id")({
   head: () =>
     pageHead(
-      "Campus listing",
-      "Explore listing details and connect directly with a seller or service provider in your campus community.",
+      "Campus Marketplace Listing",
+      "Explore product or service details, GH₵ pricing, and contact the campus seller directly on CampusLoop.",
+      { path: "/listing" },
     ),
   component: ListingDetail,
 });

@@ -6,6 +6,7 @@ import {
   Clock,
   CreditCard,
   GraduationCap,
+  Lock,
   ShieldAlert,
   ShieldCheck,
   Upload,
@@ -601,6 +602,18 @@ export function SellerVerificationCard({
               <strong>Admin approval required:</strong> Automated checks screen photo clarity only —
               a CampusLoop Admin personally inspects your ID and approves seller status.
             </span>
+          </div>
+        </div>
+
+        <div className="data-protection-notice" role="note">
+          <Lock size={16} className="shrink-0 text-primary" />
+          <div>
+            <strong>Ghana Data Protection Law (Act 843) Guarantee</strong>
+            <p>
+              We comply with Ghana’s Data Protection Act, 2012 (Act 843). Your uploaded ID card and
+              photo are encrypted in private storage, used strictly for seller identity verification
+              only, and never sold or shown publicly on your shop.
+            </p>
           </div>
         </div>
 

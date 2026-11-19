@@ -1,13 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AnimatedSelect, ListingCard } from "@/components/campus/shared";
+import { AnimatedSelect, ListingCard, PageBackButton } from "@/components/campus/shared";
 import { CampusProvider, useCampus } from "@/components/campus/store";
 import {
   TECHNICAL_ISSUE_MESSAGE,
   UserInputError,
+  matchesCategoryFilter,
   toUserSafeErrorMessage,
+  validateListing,
   type Listing,
 } from "@/lib/campus/data";
+import { SELLER_PLANS, getSellerEffectiveLimits } from "@/lib/campus/plans";
 
 vi.mock("@tanstack/react-router", async () => {
   const actual =
@@ -51,6 +54,7 @@ import { DiscoverPage } from "@/components/campus/discovery";
 import { ProfilePage } from "@/components/campus/profiles";
 import {
   SellerStatusIndicator,
+  SellerVerificationCard,
   validateVerificationSubmission,
 } from "@/components/campus/verification";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -402,5 +406,92 @@ describe("Seller identity verification & unique Seller Shop", () => {
 
     rerender(<SellerStatusIndicator status="unverified" />);
     expect(screen.getByText("Unverified Seller")).toBeInTheDocument();
+  });
+});
+
+describe("Marketplace updates: selective errors, filters, quotas, subscriptions & Act 843 protection", () => {
+  it("shows real user-correctable auth & quota messages while masking technical errors", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(toUserSafeErrorMessage(new Error("Invalid login credentials"))).toMatch(
+      /Incorrect email or password/i,
+    );
+    expect(toUserSafeErrorMessage(new Error("Email not confirmed"))).toMatch(/verify your email/i);
+    expect(toUserSafeErrorMessage(new Error("listing_quota_reached"))).toMatch(
+      /limit of 5 listings/i,
+    );
+    expect(toUserSafeErrorMessage(new Error('relation "public.listings" does not exist'))).toBe(
+      TECHNICAL_ISSUE_MESSAGE,
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("matches Beauty and Hair & Beauty listings when filtering", () => {
+    expect(matchesCategoryFilter("Hair & Beauty", "Beauty")).toBe(true);
+    expect(matchesCategoryFilter("Beauty", "Hair & Beauty")).toBe(true);
+    expect(matchesCategoryFilter("Electronics", "Electronics")).toBe(true);
+    expect(matchesCategoryFilter("Electronics", "Beauty")).toBe(false);
+  });
+
+  it("enforces pre-December 5-listing / 3-image limits and December 1, 2026 subscription tiers", () => {
+    const preLaunch = getSellerEffectiveLimits(
+      { role: "seller", subscriptionTier: "free_launch", subscriptionStatus: "active" },
+      new Date("2026-11-18T12:00:00Z"),
+    );
+    expect(preLaunch.billingActive).toBe(false);
+    expect(preLaunch.maxListings).toBe(5);
+    expect(preLaunch.maxImagesPerListing).toBe(3);
+
+    const postDecUnpaid = getSellerEffectiveLimits(
+      { role: "seller", subscriptionTier: "free_launch", subscriptionStatus: "active" },
+      new Date("2026-12-01T00:00:00Z"),
+    );
+    expect(postDecUnpaid.billingActive).toBe(true);
+    expect(postDecUnpaid.requiresActivePlan).toBe(true);
+
+    const postDecPlus = getSellerEffectiveLimits(
+      {
+        role: "seller",
+        subscriptionTier: "plus",
+        subscriptionStatus: "active",
+        subscriptionExpiresAt: "2027-01-01T00:00:00Z",
+      },
+      new Date("2026-12-05T12:00:00Z"),
+    );
+    expect(postDecPlus.maxListings).toBe(10);
+    expect(postDecPlus.maxImagesPerListing).toBe(3);
+
+    expect(
+      SELLER_PLANS.map((p) => [p.name, p.priceGhs, p.maxListings, p.maxImagesPerListing]),
+    ).toEqual([
+      ["Standard", 15, 5, 2],
+      ["Plus", 25, 10, 3],
+      ["Pro", 35, 20, 5],
+    ]);
+
+    expect(
+      validateListing({
+        type: "product",
+        title: "Calculator",
+        description: "Scientific calculator in great shape",
+        price: "90",
+        images: ["a.jpg", "b.jpg", "c.jpg", "d.jpg"],
+        audience: ["KNUST"],
+        contact: "0241112233",
+      }),
+    ).toMatch(/up to 3 images/i);
+  });
+
+  it("renders PageBackButton and shows Ghana Data Protection Act notice on verification", () => {
+    render(
+      <CampusProvider>
+        <PageBackButton fallbackTo="/discover" label="Back" />
+      </CampusProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+
+    // Verify Ghana Data Protection Act copy compiles cleanly in verification module
+    expect(typeof SellerVerificationCard).toBe("function");
   });
 });

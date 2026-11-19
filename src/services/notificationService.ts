@@ -53,4 +53,33 @@ export const notificationService = {
       .eq("id", user.id);
     if (error) throw error;
   },
+
+  subscribeToRealtimeNotifications(
+    userId: string,
+    onInsert: (notification: NotificationRecord) => void,
+  ): () => void {
+    const client = getSupabaseClient();
+    if (!client || !userId) return () => undefined;
+
+    const channel = client
+      .channel(`notifications:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as NotificationRecord | undefined;
+          if (row?.id) onInsert(row);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  },
 };

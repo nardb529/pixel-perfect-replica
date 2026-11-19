@@ -91,7 +91,9 @@ export const adminService = {
       "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, is_student, id_document_type, id_document_path, verification_photo_confirmed, verification_submitted_at, verification_note, role, is_suspended, notification_preferences, created_at, updated_at";
     const { data, error } = await supabase
       .from("profiles")
-      .select(`${baseCols}, verification_checks`)
+      .select(
+        `${baseCols}, verification_checks, subscription_tier, subscription_status, subscription_expires_at`,
+      )
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) {
@@ -196,21 +198,29 @@ export const adminService = {
     if (error) throw error;
 
     await writeAuditLog(`user_verification_${status}`, "profile", userId, cleanNote ?? undefined);
+    const title =
+      status === "verified"
+        ? "Seller account verified"
+        : status === "pending"
+          ? "Verification under review"
+          : "Seller verification needs an update";
+    const message =
+      status === "verified"
+        ? "Your CampusLoop seller verification is approved. You can now post products and services."
+        : cleanNote || `Your seller verification status was updated to ${status}.`;
     const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
-      title:
-        status === "verified"
-          ? "Seller account verified"
-          : status === "pending"
-            ? "Verification under review"
-            : "Seller verification needs an update",
-      message:
-        status === "verified"
-          ? "Your CampusLoop seller verification is approved. You can now post products and services."
-          : cleanNote || `Your seller verification status was updated to ${status}.`,
+      title,
+      message,
       notification_type: "account_update" as NotificationType,
     });
     if (notifErr) throw notifErr;
+
+    void supabase.functions
+      .invoke("push-send", {
+        body: { userIds: [userId], title, message, url: "/dashboard" },
+      })
+      .catch(() => undefined);
   },
 
   async updateUserRole(userId: string, role: UserRole): Promise<void> {
@@ -223,16 +233,30 @@ export const adminService = {
     if (error) throw error;
 
     await writeAuditLog(`user_role_${role}`, "profile", userId);
+    const title =
+      role === "admin" ? "Administrator access granted" : "Administrator access updated";
+    const message =
+      role === "admin"
+        ? "You now have full access to the CampusLoop Admin Command Center."
+        : "Your account role was changed to standard member.";
     const { error: notifErr } = await supabase.from("notifications").insert({
       user_id: userId,
-      title: role === "admin" ? "Administrator access granted" : "Administrator access updated",
-      message:
-        role === "admin"
-          ? "You now have full access to the CampusLoop Admin Command Center."
-          : "Your account role was changed to standard member.",
+      title,
+      message,
       notification_type: "account_update" as NotificationType,
     });
     if (notifErr) throw notifErr;
+
+    void supabase.functions
+      .invoke("push-send", {
+        body: {
+          userIds: [userId],
+          title,
+          message,
+          url: role === "admin" ? "/admin" : "/dashboard",
+        },
+      })
+      .catch(() => undefined);
   },
 
   async sendBroadcastNotification(input: {
@@ -246,10 +270,12 @@ export const adminService = {
     const uniqueIds = Array.from(new Set(input.targetUserIds.filter(Boolean)));
     if (uniqueIds.length === 0) return 0;
 
+    const cleanTitle = input.title.trim();
+    const cleanMessage = input.message.trim();
     const rows = uniqueIds.map((uid) => ({
       user_id: uid,
-      title: input.title.trim(),
-      message: input.message.trim(),
+      title: cleanTitle,
+      message: cleanMessage,
       notification_type: (input.notificationType ?? "platform_announcement") as NotificationType,
       metadata: { scope: input.scopeLabel ?? "broadcast" },
     }));
@@ -257,13 +283,24 @@ export const adminService = {
     const { error } = await supabase.from("notifications").insert(rows);
     if (error) throw error;
 
+    void supabase.functions
+      .invoke("push-send", {
+        body: {
+          userIds: uniqueIds,
+          title: cleanTitle,
+          message: cleanMessage,
+          url: "/dashboard",
+        },
+      })
+      .catch(() => undefined);
+
     const user = await getSessionUser(supabase);
     if (user) {
       await writeAuditLog(
         "platform_broadcast",
         "notifications",
         user.id,
-        `${input.title.trim()} → ${uniqueIds.length} recipient(s)`,
+        `${cleanTitle} → ${uniqueIds.length} recipient(s)`,
       );
     }
     return uniqueIds.length;

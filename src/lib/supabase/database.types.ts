@@ -4,6 +4,8 @@ export type AccountType = "Product Seller" | "Service Provider" | "Both";
 export type VerificationStatus = "unverified" | "pending" | "verified";
 export type IdDocumentType = "Student ID" | "Ghana Card" | "Voters ID";
 export type UserRole = "user" | "admin";
+export type SubscriptionTier = "free_launch" | "standard" | "plus" | "pro";
+export type SubscriptionStatus = "inactive" | "active" | "past_due" | "cancelled";
 export type AffiliationType = "Student" | "Alumni" | "Business" | "Service Provider" | "Other";
 export type CategoryType = "product" | "service";
 export type ListingType = "product" | "service";
@@ -80,9 +82,40 @@ export interface ProfileRecord {
   verification_submitted_at: string | null;
   verification_note: string | null;
   verification_checks?: VerificationChecksPayload | null | undefined;
+  subscription_tier?: SubscriptionTier | undefined;
+  subscription_status?: SubscriptionStatus | undefined;
+  subscription_expires_at?: string | null | undefined;
+  paystack_customer_code?: string | null | undefined;
+  paystack_reference?: string | null | undefined;
   role: UserRole;
   is_suspended: boolean;
   notification_preferences: NotificationPreferences;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PushSubscriptionRecord {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SellerSubscriptionRecord {
+  id: string;
+  user_id: string;
+  plan_tier: Exclude<SubscriptionTier, "free_launch">;
+  amount_ghs: number;
+  currency: string;
+  status: "pending" | "active" | "failed" | "cancelled" | "expired";
+  paystack_reference: string;
+  paystack_authorization_url: string | null;
+  starts_at: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }

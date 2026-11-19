@@ -10,8 +10,13 @@ const ProfilePage = lazy(() =>
 export const Route = createFileRoute("/seller/$id")({
   head: () =>
     pageHead(
-      "Seller shop storefront",
-      "Browse all campus products and services provided by this verified seller.",
+      "Seller Shop Storefront",
+      "Explore all campus products and services from this CampusLoop seller shop. Contact directly on WhatsApp or phone — no buyer account required.",
+      {
+        imagePath: "/og-shop.jpg",
+        imageAlt: "CampusLoop Seller Shop Storefront — Campus Products and Services",
+        type: "profile",
+      },
     ),
   component: Seller,
 });

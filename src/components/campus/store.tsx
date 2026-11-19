@@ -22,6 +22,11 @@ import {
 } from "@/lib/supabase/client";
 import { clearAnalyticsSessionCache } from "@/services/analyticsService";
 import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
+import {
+  removePushSubscriptionForCurrentUser,
+  showDeviceNotification,
+  syncPushSubscriptionForCurrentUser,
+} from "@/lib/campus/push";
 import type {
   CategoryRecord,
   IdDocumentType,
@@ -29,6 +34,8 @@ import type {
   NotificationRecord,
   ProfileRecord,
   ReportReason,
+  SubscriptionStatus,
+  SubscriptionTier,
   UniversityRecord,
   UserRole,
   VerificationStatus,
@@ -69,6 +76,9 @@ export type CampusUser = {
   verificationNote?: string | null | undefined;
   verificationChecks?: VerificationChecksPayload | null | undefined;
   isSuspended?: boolean | undefined;
+  subscriptionTier?: SubscriptionTier | undefined;
+  subscriptionStatus?: SubscriptionStatus | undefined;
+  subscriptionExpiresAt?: string | null | undefined;
   notificationPreferences?: NotificationPreferences | undefined;
 };
 
@@ -110,6 +120,9 @@ function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): 
     verificationNote: profile.verification_note,
     verificationChecks: profile.verification_checks ?? null,
     isSuspended: profile.is_suspended,
+    subscriptionTier: profile.subscription_tier ?? "free_launch",
+    subscriptionStatus: profile.subscription_status ?? "active",
+    subscriptionExpiresAt: profile.subscription_expires_at ?? null,
     notificationPreferences: profile.notification_preferences,
   };
 }
@@ -368,6 +381,9 @@ export function CampusProvider({ children }: { children: ReactNode }) {
           capability: String(session.user.user_metadata?.["account_type"] || "Both"),
           isStudent: session.user.user_metadata?.["is_student"] !== false,
           verificationStatus: "unverified",
+          subscriptionTier: "free_launch",
+          subscriptionStatus: "active",
+          subscriptionExpiresAt: null,
           bio: "",
           contact: "WhatsApp",
         };
@@ -471,6 +487,22 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     void refreshListings();
   }, [refreshListings]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user?.id) return;
+    if (notificationsEnabled) {
+      void syncPushSubscriptionForCurrentUser();
+    }
+    return notificationService.subscribeToRealtimeNotifications(user.id, (row) => {
+      setNotifications((prev) => (prev.some((n) => n.id === row.id) ? prev : [row, ...prev]));
+      void showDeviceNotification({
+        title: row.title,
+        body: row.message,
+        url: "/dashboard",
+        tag: row.id,
+      });
+    });
+  }, [notificationsEnabled, user?.id]);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next: ThemeMode = prev === "dark" ? "light" : "dark";
@@ -515,7 +547,11 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     try {
       const permission = await Notification.requestPermission();
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
-      setNotificationsEnabled(permission === "granted");
+      const granted = permission === "granted";
+      setNotificationsEnabled(granted);
+      if (granted) {
+        void syncPushSubscriptionForCurrentUser();
+      }
       return permission;
     } catch {
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
@@ -572,6 +608,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOutUser = useCallback(async () => {
+    await removePushSubscriptionForCurrentUser();
     if (isSupabaseConfigured) {
       await authenticationService.signOut();
     }

@@ -82,17 +82,42 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "CampusLoop" },
-      { name: "description", content: "Your campus. Your marketplace." },
+      { title: "CampusLoop — Ghana University Campus Marketplace" },
+      {
+        name: "description",
+        content:
+          "CampusLoop is the Ghana university campus marketplace for student products, verified services, books, electronics, and hostelling essentials. Buyers need no account.",
+      },
       { name: "theme-color", content: "#4965F5" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "CampusLoop" },
-      { property: "og:title", content: "CampusLoop" },
-      { property: "og:description", content: "Your campus. Your marketplace." },
+      { property: "og:site_name", content: "CampusLoop Marketplace" },
+      { property: "og:title", content: "CampusLoop — Ghana University Campus Marketplace" },
+      {
+        property: "og:description",
+        content:
+          "Buy and sell student products and verified services across KNUST, UG, UCC, UDS, UENR, and Ghanaian campuses. Buyers shop freely without an account.",
+      },
       { property: "og:type", content: "website" },
+      {
+        property: "og:image",
+        content: "https://pixel-perfect-replica-five-psi.vercel.app/og-marketplace.jpg",
+      },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "CampusLoop — Ghana University Campus Marketplace" },
+      {
+        name: "twitter:description",
+        content:
+          "Buy and sell student products and verified services across Ghanaian university campuses. No buyer account needed.",
+      },
+      {
+        name: "twitter:image",
+        content: "https://pixel-perfect-replica-five-psi.vercel.app/og-marketplace.jpg",
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

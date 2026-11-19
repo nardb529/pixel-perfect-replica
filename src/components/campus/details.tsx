@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   BadgeCheck,
   MapPin,
   Share2,
@@ -23,6 +22,7 @@ import {
   ListingCard,
   Empty,
   Likes,
+  PageBackButton,
   SaveButton,
   AnimatedSelect,
   PagePendingFallback,
@@ -150,10 +150,7 @@ export function DetailPage({ id }: { id: string }) {
 
   return (
     <Shell>
-      <Link to="/discover" className="back-link">
-        <ArrowLeft size={15} />
-        Back
-      </Link>
+      <PageBackButton fallbackTo="/discover" label="Back" />
 
       <div className="detail-grid">
         <div className="surface-panel detail-media-panel">

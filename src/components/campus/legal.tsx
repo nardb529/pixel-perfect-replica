@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   Bell,
   BookOpen,
   Compass,
@@ -15,17 +14,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/campus/data";
-import { HeroAmbient, PageIntro, Shell } from "./shared";
+import { HeroAmbient, PageBackButton, PageIntro, Shell } from "./shared";
 import { useCampus } from "./store";
 
 export function PrivacyPage() {
   return (
     <Shell>
       <div className="legal-wrap">
-        <Link to="/profile" className="back-link">
-          <ArrowLeft size={15} />
-          Back to profile
-        </Link>
+        <PageBackButton fallbackTo="/profile" label="Back" />
 
         <section className="surface-panel hero-panel curve-accent">
           <HeroAmbient />
@@ -92,6 +88,22 @@ export function PrivacyPage() {
               never sell your data to third-party advertisers.
             </p>
           </article>
+
+          <article className="surface-panel md:col-span-2">
+            <div className="legal-card-head">
+              <span className="legal-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <h2>5. Ghana Data Protection Act, 2012 (Act 843)</h2>
+            </div>
+            <p>
+              {BRAND} strictly complies with the Ghana Data Protection Act, 2012 (Act 843). Student
+              IDs, Ghana Cards, Voter&apos;s IDs, and matching seller photos submitted during
+              verification are stored in private encrypted buckets, accessed solely by authorized
+              administrators to verify seller identity, and never used for any other purpose or
+              exposed publicly.
+            </p>
+          </article>
         </div>
 
         <section className="surface-panel legal-footer-card">
@@ -117,10 +129,7 @@ export function TermsPage() {
   return (
     <Shell>
       <div className="legal-wrap">
-        <Link to="/profile" className="back-link">
-          <ArrowLeft size={15} />
-          Back to profile
-        </Link>
+        <PageBackButton fallbackTo="/profile" label="Back" />
 
         <section className="surface-panel hero-panel curve-accent">
           <HeroAmbient />
@@ -213,10 +222,7 @@ export function ManualPage() {
   return (
     <Shell>
       <div className="legal-wrap">
-        <Link to="/profile" className="back-link">
-          <ArrowLeft size={15} />
-          Back to profile
-        </Link>
+        <PageBackButton fallbackTo="/profile" label="Back" />
 
         <section className="surface-panel hero-panel curve-accent">
           <HeroAmbient />

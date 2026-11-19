@@ -15,7 +15,6 @@ import {
   Sun,
   ChevronRight,
   Shield,
-  ArrowLeft,
   Phone,
   Share2,
   ShoppingBag,
@@ -35,6 +34,7 @@ import {
   Empty,
   AnimatedSelect,
   PagePendingFallback,
+  PageBackButton,
 } from "./shared";
 import {
   TECHNICAL_ISSUE_MESSAGE,
@@ -333,61 +333,58 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
   return (
     <Shell>
-      {sellerId && (
-        <Link to="/discover" className="back-link">
-          <ArrowLeft size={15} />
-          Back to marketplace
-        </Link>
-      )}
+      <PageBackButton fallbackTo="/discover" label="Back" />
 
       <section className="surface-panel hero-panel profile-hero-panel curve-accent">
         <HeroAmbient />
         <div className="profile-top">
-          {safeProfileAvatar ? (
-            <img
-              className="profile-avatar"
-              src={safeProfileAvatar}
-              alt={profile?.name || "Profile photo"}
-              decoding="async"
-            />
-          ) : (
-            <span className="profile-avatar">
-              {profile ? (
-                profile.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")
-              ) : (
-                <UserRound size={30} />
-              )}
-            </span>
-          )}
-          <div className="profile-heading">
-            <p className="greeting">
-              <span className="greeting-pulse" aria-hidden="true" />
-              {sellerId ? "Seller shop storefront" : user ? "Seller studio" : "Buyer pass"}
-            </p>
-            <h1 className="seller-name-inline">
-              {sellerId ? `${profile?.name || "Seller"}’s Shop` : profile?.name || "Guest buyer"}
-              {profile?.verificationStatus === "verified" && (
-                <BadgeCheck
-                  size={18}
-                  className="verified-inline-icon"
-                  aria-label="Verified campus seller"
-                />
-              )}
-            </h1>
-            <p>
-              {profile?.username ? `@${profile.username} · ` : ""}
-              {affiliations.length > 1
-                ? affiliations.join(" · ")
-                : profile?.university || `Browsing ${university}`}
-            </p>
-            <small>
-              {profile?.capability || "Browse & contact sellers without an account"}
-              {profile?.verificationStatus === "verified" ? " · Verified seller" : ""}
-            </small>
+          <div className="profile-identity-row">
+            {safeProfileAvatar ? (
+              <img
+                className="profile-avatar"
+                src={safeProfileAvatar}
+                alt={profile?.name || "Profile photo"}
+                decoding="async"
+              />
+            ) : (
+              <span className="profile-avatar">
+                {profile ? (
+                  profile.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                ) : (
+                  <UserRound size={30} />
+                )}
+              </span>
+            )}
+            <div className="profile-heading">
+              <p className="greeting">
+                <span className="greeting-pulse" aria-hidden="true" />
+                {sellerId ? "Seller shop storefront" : user ? "Seller studio" : "Buyer pass"}
+              </p>
+              <h1 className="seller-name-inline">
+                {sellerId ? `${profile?.name || "Seller"}’s Shop` : profile?.name || "Guest buyer"}
+                {profile?.verificationStatus === "verified" && (
+                  <BadgeCheck
+                    size={18}
+                    className="verified-inline-icon"
+                    aria-label="Verified campus seller"
+                  />
+                )}
+              </h1>
+              <p>
+                {profile?.username ? `@${profile.username} · ` : ""}
+                {affiliations.length > 1
+                  ? affiliations.join(" · ")
+                  : profile?.university || `Browsing ${university}`}
+              </p>
+              <small>
+                {profile?.capability || "Browse & contact sellers without an account"}
+                {profile?.verificationStatus === "verified" ? " · Verified seller" : ""}
+              </small>
+            </div>
           </div>
           {user && !sellerId && (
             <Button

@@ -22,7 +22,7 @@ import type {
 
 const PROFILE_COLUMNS_BASE =
   "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, is_student, id_document_type, id_document_path, verification_photo_confirmed, verification_submitted_at, verification_note, role, is_suspended, notification_preferences, created_at, updated_at";
-const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, verification_checks`;
+const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, verification_checks, subscription_tier, subscription_status, subscription_expires_at`;
 const PUBLIC_SELLER_COLUMNS =
   "id, full_name, username, profile_image, bio, account_type, primary_university_id, verification_status, preferred_contact_method, public_contact_handle, is_suspended, created_at";
 

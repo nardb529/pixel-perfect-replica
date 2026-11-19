@@ -9,7 +9,14 @@ const ProfilePage = lazy(() =>
 
 export const Route = createFileRoute("/profile")({
   head: () =>
-    pageHead("Your campus profile", "Find your saved listings and manage your CampusLoop profile."),
+    pageHead(
+      "Your campus profile",
+      "Find your saved listings and manage your CampusLoop profile.",
+      {
+        path: "/profile",
+        noIndex: true,
+      },
+    ),
   component: ProfileRouteComponent,
 });
 

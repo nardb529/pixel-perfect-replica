@@ -10,8 +10,8 @@ const AuthPage = lazy(() =>
 export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead(
-      "Join the seller community",
-      "Preview signing up or logging in to sell products and offer services on CampusLoop.",
+      "Seller Sign In & Verification",
+      "Sign in or create a seller account to list products and offer verified services on the CampusLoop campus marketplace.",
     ),
   component: AuthRouteComponent,
 });

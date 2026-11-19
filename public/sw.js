@@ -1,4 +1,4 @@
-const CACHE_NAME = "campusloop-v5";
+const CACHE_NAME = "campusloop-v6";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.svg",
@@ -103,5 +103,64 @@ self.addEventListener("fetch", (event) => {
             (cached) => cached || (request.mode === "navigate" ? caches.match("/") : undefined),
           ),
       ),
+  );
+});
+
+// Deliver real device notifications even when the installed PWA / browser is closed
+self.addEventListener("push", (event) => {
+  let payload = {
+    title: "CampusLoop",
+    body: "You have a new campus marketplace update.",
+    url: "/dashboard",
+    tag: "campusloop-alert",
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      payload = {
+        title: parsed.title || payload.title,
+        body: parsed.message || parsed.body || payload.body,
+        url: parsed.url || payload.url,
+        tag: parsed.tag || parsed.id || payload.tag,
+      };
+    } catch {
+      const rawText = event.data.text();
+      if (rawText) payload.body = rawText;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "/pwa-192x192.png",
+      badge: "/pwa-192x192.png",
+      tag: payload.tag,
+      renotify: true,
+      data: { url: payload.url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/dashboard";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      const absoluteTarget = new URL(targetUrl, self.location.origin).href;
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          if ("navigate" in client) {
+            return client.navigate(absoluteTarget).then(() => client.focus());
+          }
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(absoluteTarget);
+      }
+      return undefined;
+    }),
   );
 });

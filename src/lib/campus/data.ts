@@ -21,6 +21,92 @@ export function toUserSafeErrorMessage(err: unknown): string {
   if (err instanceof UserInputError && err.message.trim()) {
     return err.message;
   }
+
+  const rawMessage =
+    typeof err === "string"
+      ? err
+      : err instanceof Error
+        ? err.message
+        : err && typeof err === "object" && "message" in err
+          ? String((err as { message?: unknown }).message ?? "")
+          : "";
+  const rawCode =
+    err && typeof err === "object" && "code" in err
+      ? String((err as { code?: unknown }).code ?? "")
+      : "";
+  const normalized = rawMessage.toLowerCase();
+
+  // Always mask PostgREST, SQL relation, JWT, and network transport failures behind generic copy
+  const isTechnicalFault =
+    rawCode.startsWith("PGRST") ||
+    normalized.includes("pgrst") ||
+    normalized.includes("relation ") ||
+    normalized.includes("does not exist") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("load failed") ||
+    normalized.includes("supabase is not configured");
+
+  if (!isTechnicalFault && rawMessage.trim()) {
+    if (normalized.includes("invalid login credentials") || rawCode === "invalid_credentials") {
+      return "Incorrect email or password. Please check your details and try again.";
+    }
+    if (normalized.includes("email not confirmed") || rawCode === "email_not_confirmed") {
+      return "Please verify your email address using the confirmation link sent to your inbox before signing in.";
+    }
+    if (
+      normalized.includes("user already registered") ||
+      normalized.includes("already been registered") ||
+      rawCode === "user_already_exists"
+    ) {
+      return "An account with this email already exists. Switch to Log In or reset your password.";
+    }
+    if (normalized.includes("password should be at least") || rawCode === "weak_password") {
+      return "Choose a stronger password (at least 8 characters).";
+    }
+    if (
+      normalized.includes("new password should be different") ||
+      normalized.includes("same password")
+    ) {
+      return "Choose a new password that is different from your current password.";
+    }
+    if (
+      normalized.includes("unable to validate email address") ||
+      normalized.includes("invalid format") ||
+      normalized.includes("valid email")
+    ) {
+      return "Enter a valid email address and try again.";
+    }
+    if (
+      normalized.includes("rate limit") ||
+      normalized.includes("too many requests") ||
+      normalized.includes("only request this after") ||
+      rawCode === "over_email_send_rate_limit" ||
+      rawCode === "over_request_rate_limit"
+    ) {
+      return "Too many attempts right now. Please wait a minute and try again.";
+    }
+    if (
+      normalized.includes("profiles_username_key") ||
+      (rawCode === "23505" && normalized.includes("username"))
+    ) {
+      return "That username is already taken. Try adding a few numbers or initials.";
+    }
+    if (normalized.includes("listing_quota_reached")) {
+      return "You have reached your current limit of 5 listings per account.";
+    }
+    if (normalized.includes("listing_subscription_required")) {
+      return "An active seller plan (starting 1st December, 2026) is required before adding more listings.";
+    }
+    if (normalized.includes("listing_image_limit_reached")) {
+      return "You have reached the maximum number of photos allowed per listing on your plan.";
+    }
+    if (normalized.includes("auth session missing")) {
+      return "Your session expired. Please sign in again to continue.";
+    }
+  }
+
   if (err !== undefined && err !== null) {
     console.error("[CampusLoop handled error]", err);
   }
@@ -137,6 +223,16 @@ export function isSafeMediaUrl(url?: string | null): boolean {
   }
 }
 
+export function matchesCategoryFilter(listingCategory: string, selectedCategory: string): boolean {
+  const target = selectedCategory.trim().toLowerCase();
+  if (!target || target === "all") return true;
+  const current = listingCategory.trim().toLowerCase();
+  if (current === target) return true;
+  if (target === "beauty" && current === "hair & beauty") return true;
+  if (target === "hair & beauty" && current === "beauty") return true;
+  return false;
+}
+
 export function filterListings(
   listings: Listing[],
   university: string,
@@ -145,6 +241,7 @@ export function filterListings(
   category = "All",
   maxPrice = Infinity,
 ) {
+  const q = query.trim().toLowerCase();
   return listings.filter(
     (l) =>
       l.status === "Active" &&
@@ -152,11 +249,12 @@ export function filterListings(
         l.audience.includes("All Universities") ||
         l.audience.includes(university)) &&
       (!type || l.type === type) &&
-      (category === "All" || l.category === category) &&
+      matchesCategoryFilter(l.category, category) &&
       l.price <= maxPrice &&
-      `${l.title} ${l.seller} ${l.category} ${l.description} ${l.university} ${l.audience.join(" ")}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+      (!q ||
+        `${l.title} ${l.seller} ${l.category} ${l.description} ${l.university} ${l.audience.join(" ")}`
+          .toLowerCase()
+          .includes(q)),
   );
 }
 
@@ -188,9 +286,13 @@ export function validateListing(values: {
   images: string[];
   audience: string[];
   contact: string;
+  maxImages?: number | undefined;
 }) {
+  const maxImages = values.maxImages ?? 3;
   if (!values.images.length) return "Add at least one image.";
-  if (values.images.length > 8) return "Upload up to 8 images per listing.";
+  if (values.images.length > maxImages) {
+    return `Upload up to ${maxImages} image${maxImages === 1 ? "" : "s"} per listing.`;
+  }
   const title = values.title.trim();
   const description = values.description.trim();
   if (!title || !description) return "Add a name and description.";

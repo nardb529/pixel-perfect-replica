@@ -1,0 +1,29 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { u as require_react } from "../_libs/@floating-ui/react-dom+[...].mjs";
+import { t as require_jsx_dev_runtime } from "../_libs/react.mjs";
+import { d as PagePendingFallback } from "./shared-CshecdmH.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/auth-4G0dl-su.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_dev_runtime = require_jsx_dev_runtime();
+var _jsxFileName = "/app/applet/src/routes/auth.tsx?tsr-split=component";
+var AuthPage = (0, import_react.lazy)(() => import("./auth-CUUH76AB.mjs").then((m) => ({ default: m.AuthPage })));
+function AuthRouteComponent() {
+	return /* @__PURE__ */ (0, import_jsx_dev_runtime.jsxDEV)(import_react.Suspense, {
+		fallback: /* @__PURE__ */ (0, import_jsx_dev_runtime.jsxDEV)(PagePendingFallback, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 7,
+			columnNumber: 30
+		}, this),
+		children: /* @__PURE__ */ (0, import_jsx_dev_runtime.jsxDEV)(AuthPage, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 8,
+			columnNumber: 7
+		}, this)
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 7,
+		columnNumber: 10
+	}, this);
+}
+//#endregion
+export { AuthRouteComponent as component };

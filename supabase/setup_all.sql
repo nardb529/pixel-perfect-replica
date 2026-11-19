@@ -129,6 +129,11 @@ create table if not exists public.profiles (
   role public.user_role_enum not null default 'user',
   is_suspended boolean not null default false,
   notification_preferences jsonb not null default '{"listing_updates": true, "announcements": true, "enquiries": true}'::jsonb,
+  subscription_tier text not null default 'free_launch' check (subscription_tier in ('free_launch', 'standard', 'plus', 'pro')),
+  subscription_status text not null default 'inactive' check (subscription_status in ('inactive', 'active', 'past_due', 'cancelled')),
+  subscription_expires_at timestamptz,
+  paystack_customer_code text,
+  paystack_reference text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -140,6 +145,11 @@ alter table public.profiles add column if not exists verification_photo_confirme
 alter table public.profiles add column if not exists verification_submitted_at timestamptz;
 alter table public.profiles add column if not exists verification_note text;
 alter table public.profiles add column if not exists verification_checks jsonb;
+alter table public.profiles add column if not exists subscription_tier text not null default 'free_launch';
+alter table public.profiles add column if not exists subscription_status text not null default 'inactive';
+alter table public.profiles add column if not exists subscription_expires_at timestamptz;
+alter table public.profiles add column if not exists paystack_customer_code text;
+alter table public.profiles add column if not exists paystack_reference text;
 
 do $$ begin
   alter table public.profiles
@@ -411,7 +421,46 @@ create table if not exists public.notifications (
 create index if not exists idx_notifications_user_unread
   on public.notifications (user_id, is_read, created_at desc);
 
--- Future promotion / featured slot configuration (ZERO payment/checkout/commissions)
+-- Web Push device subscriptions (allows OS notifications when installed app is closed)
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  user_agent text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, endpoint)
+);
+
+create index if not exists idx_push_subscriptions_user on public.push_subscriptions (user_id);
+
+-- Seller monthly subscriptions (billing launches 1st December, 2026 via Paystack)
+create table if not exists public.seller_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  plan_tier text not null check (plan_tier in ('standard', 'plus', 'pro')),
+  amount_ghs numeric(10, 2) not null check (amount_ghs > 0),
+  currency text not null default 'GHS',
+  status text not null default 'pending' check (status in ('pending', 'active', 'failed', 'cancelled', 'expired')),
+  paystack_reference text not null unique,
+  paystack_authorization_url text,
+  starts_at timestamptz,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_seller_subscriptions_user
+  on public.seller_subscriptions (user_id, created_at desc);
+
+drop trigger if exists trg_seller_subscriptions_updated_at on public.seller_subscriptions;
+create trigger trg_seller_subscriptions_updated_at
+  before update on public.seller_subscriptions
+  for each row execute function public.set_updated_at();
+
+-- Future promotion / featured slot configuration
 create table if not exists public.promotion_configs (
   id uuid primary key default gen_random_uuid(),
   plan_key text not null unique,
@@ -463,6 +512,11 @@ begin
     new.role := old.role;
     new.is_suspended := old.is_suspended;
     new.verification_note := old.verification_note;
+    new.subscription_tier := old.subscription_tier;
+    new.subscription_status := old.subscription_status;
+    new.subscription_expires_at := old.subscription_expires_at;
+    new.paystack_customer_code := old.paystack_customer_code;
+    new.paystack_reference := old.paystack_reference;
 
     v_valid_submission :=
       nullif(trim(coalesce(new.profile_image, '')), '') is not null
@@ -490,6 +544,123 @@ drop trigger if exists trg_protect_profile_privileged on public.profiles;
 create trigger trg_protect_profile_privileged
   before update on public.profiles
   for each row execute function public.protect_profile_privileged_columns();
+
+create or replace function public.enforce_seller_listing_quota()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tier text;
+  v_status text;
+  v_expires timestamptz;
+  v_max_listings integer;
+  v_current_count integer;
+begin
+  if auth.uid() is null or public.is_admin() then
+    return new;
+  end if;
+
+  if now() < timestamptz '2026-12-01 00:00:00+00' then
+    v_max_listings := 5;
+  else
+    select subscription_tier, subscription_status, subscription_expires_at
+    into v_tier, v_status, v_expires
+    from public.profiles
+    where id = new.seller_id;
+
+    if v_status <> 'active' or (v_expires is not null and v_expires <= now()) then
+      raise exception 'LISTING_SUBSCRIPTION_REQUIRED';
+    end if;
+
+    v_max_listings := case v_tier
+      when 'standard' then 5
+      when 'plus' then 10
+      when 'pro' then 20
+      else 0
+    end;
+    if v_max_listings <= 0 then
+      raise exception 'LISTING_SUBSCRIPTION_REQUIRED';
+    end if;
+  end if;
+
+  select count(*) into v_current_count
+  from public.listings
+  where seller_id = new.seller_id
+    and status <> 'Archived';
+
+  if v_current_count >= v_max_listings then
+    raise exception 'LISTING_QUOTA_REACHED';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_seller_listing_quota on public.listings;
+create trigger trg_enforce_seller_listing_quota
+  before insert on public.listings
+  for each row execute function public.enforce_seller_listing_quota();
+
+create or replace function public.enforce_listing_image_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_seller_id uuid;
+  v_tier text;
+  v_status text;
+  v_expires timestamptz;
+  v_max_images integer;
+  v_current_count integer;
+begin
+  if auth.uid() is null or public.is_admin() then
+    return new;
+  end if;
+
+  select seller_id into v_seller_id
+  from public.listings
+  where id = new.listing_id;
+
+  if now() < timestamptz '2026-12-01 00:00:00+00' then
+    v_max_images := 3;
+  else
+    select subscription_tier, subscription_status, subscription_expires_at
+    into v_tier, v_status, v_expires
+    from public.profiles
+    where id = v_seller_id;
+
+    if v_status = 'active' and (v_expires is null or v_expires > now()) then
+      v_max_images := case v_tier
+        when 'standard' then 2
+        when 'plus' then 3
+        when 'pro' then 5
+        else 3
+      end;
+    else
+      v_max_images := 3;
+    end if;
+  end if;
+
+  select count(*) into v_current_count
+  from public.listing_images
+  where listing_id = new.listing_id;
+
+  if v_current_count >= v_max_images then
+    raise exception 'LISTING_IMAGE_LIMIT_REACHED';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_listing_image_limit on public.listing_images;
+create trigger trg_enforce_listing_image_limit
+  before insert on public.listing_images
+  for each row execute function public.enforce_listing_image_limit();
 
 create or replace function public.protect_listing_privileged_columns()
 returns trigger
@@ -776,9 +947,11 @@ as $$
       and (p_max_price is null or coalesce(l.price, 0) <= p_max_price)
       and (
         nullif(trim(coalesce(p_category_filter, '')), '') is null
-        or lower(p_category_filter) = 'all'
-        or lower(c.name) = lower(p_category_filter)
-        or lower(c.slug) = lower(p_category_filter)
+        or lower(trim(p_category_filter)) = 'all'
+        or lower(trim(c.name)) = lower(trim(p_category_filter))
+        or lower(trim(c.slug)) = lower(trim(p_category_filter))
+        or (lower(trim(p_category_filter)) = 'beauty' and lower(trim(c.name)) in ('beauty', 'hair & beauty'))
+        or (lower(trim(p_category_filter)) = 'hair & beauty' and lower(trim(c.name)) in ('beauty', 'hair & beauty'))
       )
       and (
         nullif(trim(coalesce(p_university_filter, '')), '') is null
@@ -1309,6 +1482,8 @@ alter table public.contact_clicks enable row level security;
 alter table public.reports enable row level security;
 alter table public.moderation_logs enable row level security;
 alter table public.notifications enable row level security;
+alter table public.push_subscriptions enable row level security;
+alter table public.seller_subscriptions enable row level security;
 alter table public.promotion_configs enable row level security;
 
 -- ---------------------------------------------------------------------------
@@ -1692,6 +1867,32 @@ drop policy if exists "Admins send notifications" on public.notifications;
 create policy "Admins send notifications"
   on public.notifications for insert
   with check (public.is_admin());
+
+-- Push Subscriptions: users manage their own device subscriptions
+drop policy if exists "Users manage own push subscriptions" on public.push_subscriptions;
+create policy "Users manage own push subscriptions"
+  on public.push_subscriptions for all
+  using (auth.uid() = user_id or public.is_admin())
+  with check (auth.uid() = user_id or public.is_admin());
+
+-- Seller Subscriptions: owners view own billing history; admins/service_role manage
+drop policy if exists "Owners and admins view subscriptions" on public.seller_subscriptions;
+create policy "Owners and admins view subscriptions"
+  on public.seller_subscriptions for select
+  using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Admins manage seller subscriptions" on public.seller_subscriptions;
+create policy "Admins manage seller subscriptions"
+  on public.seller_subscriptions for all
+  using (public.is_admin())
+  with check (public.is_admin());
+
+do $$ begin
+  alter publication supabase_realtime add table public.notifications;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end $$;
 
 -- Promotion Configs
 drop policy if exists "Public views active promotion configs" on public.promotion_configs;

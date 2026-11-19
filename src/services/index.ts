@@ -8,3 +8,4 @@ export { analyticsService } from "./analyticsService";
 export { reportService } from "./reportService";
 export { notificationService } from "./notificationService";
 export { adminService } from "./adminService";
+export { subscriptionService } from "./subscriptionService";
