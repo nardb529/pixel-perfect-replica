@@ -1,51 +1,107 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://campusloop-gh.vercel.app/</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/discover</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.95</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/products</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/services</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/manual</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/auth</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/privacy</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://campusloop-gh.vercel.app/terms</loc>
-    <lastmod>2026-11-19</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-</urlset>
+import { createFileRoute } from "@tanstack/react-router";
+
+const SITE = "https://campusloop-gh.vercel.app";
+
+const STATIC_PAGES: Array<{ path: string; changefreq: string; priority: string }> = [
+  { path: "/", changefreq: "daily", priority: "1.0" },
+  { path: "/discover", changefreq: "hourly", priority: "0.95" },
+  { path: "/products", changefreq: "hourly", priority: "0.9" },
+  { path: "/services", changefreq: "hourly", priority: "0.9" },
+  { path: "/manual", changefreq: "weekly", priority: "0.75" },
+  { path: "/auth", changefreq: "monthly", priority: "0.6" },
+  { path: "/privacy", changefreq: "monthly", priority: "0.4" },
+  { path: "/terms", changefreq: "monthly", priority: "0.4" },
+];
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function urlEntry(loc: string, lastmod: string, changefreq: string, priority: string): string {
+  return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+}
+
+function toDay(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString().slice(0, 10);
+}
+
+// Public rows only (the same rows any visitor can already see). Never throws.
+async function fetchPublicRows(path: string): Promise<Array<Record<string, unknown>>> {
+  const base = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "").trim();
+  const anon = (
+    process.env["SUPABASE_ANON_KEY"] ||
+    process.env["VITE_SUPABASE_ANON_KEY"] ||
+    ""
+  ).trim();
+  if (!base || !anon) return [];
+  try {
+    const response = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${path}`, {
+      headers: { apikey: anon, Authorization: `Bearer ${anon}` },
+    });
+    if (!response.ok) return [];
+    const rows = (await response.json()) as unknown;
+    return Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : [];
+  } catch {
+    return [];
+  }
+}
+
+export const Route = createFileRoute("/sitemap.xml")({
+  server: {
+    handlers: {
+      GET: async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const entries = STATIC_PAGES.map((page) =>
+          urlEntry(`${SITE}${page.path}`, today, page.changefreq, page.priority),
+        );
+
+        const [listings, sellers] = await Promise.all([
+          fetchPublicRows(
+            "listings?select=id,updated_at&status=eq.Active&order=updated_at.desc&limit=1000",
+          ),
+          fetchPublicRows(
+            "public_seller_profiles?select=id,created_at&verification_status=eq.verified&limit=1000",
+          ),
+        ]);
+
+        for (const row of listings) {
+          if (typeof row["id"] !== "string") continue;
+          entries.push(
+            urlEntry(
+              `${SITE}/listing/${row["id"]}`,
+              toDay(row["updated_at"], today),
+              "weekly",
+              "0.7",
+            ),
+          );
+        }
+        for (const row of sellers) {
+          if (typeof row["id"] !== "string") continue;
+          entries.push(
+            urlEntry(
+              `${SITE}/seller/${row["id"]}`,
+              toDay(row["created_at"], today),
+              "weekly",
+              "0.6",
+            ),
+          );
+        }
+
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`;
+        return new Response(xml, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/xml; charset=utf-8",
+            "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        });
+      },
+    },
+  },
+});
