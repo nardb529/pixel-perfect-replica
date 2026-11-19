@@ -127,5 +127,5 @@ Disallow: /profile
 Disallow: /reset-password
 Disallow: /api/
 
-Sitemap: https://pixel-perfect-replica-five-psi.vercel.app/sitemap.xml
-# AEO / LLM Guide: https://pixel-perfect-replica-five-psi.vercel.app/llms.txt
+Sitemap: https://campusloop-gh.vercel.app/sitemap.xml
+# AEO / LLM Guide: https://campusloop-gh.vercel.app/llms.txt
