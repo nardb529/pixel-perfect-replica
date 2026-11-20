@@ -29,7 +29,6 @@ import { useCampus } from "./store";
 import { SellerVerificationCard } from "./verification";
 import {
   Shell,
-  HeroAmbient,
   PageIntro,
   SectionTitle,
   Empty,
@@ -306,56 +305,75 @@ export function DashboardPage() {
     <Shell>
       <PageBackButton fallbackTo="/discover" label="Back" />
 
-      <section className="surface-panel hero-panel dashboard-hero-panel curve-accent">
-        <HeroAmbient />
-
-        <div className="dashboard-top">
-          <div className="dashboard-header-info">
-            <PageIntro
-              eyebrow={user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
-              title={`Welcome back, ${user.name.split(" ")[0]}`}
-              text="Manage your products, services, performance and enquiries."
-            />
-            <div className="seller-quota-pill">
-              <ShieldCheck size={14} aria-hidden="true" />
-              <span>
-                {limits.planLabel} ·{" "}
-                <strong>
-                  {activeListingCount}/{limits.maxListings}
-                </strong>{" "}
-                uploads · max {limits.maxImagesPerListing} photos/item
-              </span>
-            </div>
-          </div>
-          <div className="dashboard-header-actions">
-            {user.role === "admin" && !isSuspended && (
-              <Button variant="outline" className="admin-launch-btn" asChild>
-                <Link to="/admin">
-                  <Shield size={15} />
-                  Admin Command Center
-                </Link>
-              </Button>
-            )}
-            {user.id && (
-              <Button variant="outline" asChild>
-                <Link to="/seller/$id" params={{ id: user.id }}>
-                  <StoreIcon size={15} />
-                  View my shop
-                </Link>
-              </Button>
-            )}
-            {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
-              <Button className="dashboard-create-btn" asChild>
-                <Link to="/post">
-                  <Plus size={16} />
-                  Create listing
-                </Link>
-              </Button>
-            )}
+      <section className="dash-hero">
+        <div className="dash-cover" aria-hidden="true" />
+        <div className="dash-welcome">
+          {user.avatar && /^https?:\/\//.test(user.avatar) ? (
+            <img className="dash-avatar" src={user.avatar} alt="" decoding="async" />
+          ) : (
+            <span className="dash-avatar">
+              {user.name
+                .split(" ")
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join("")}
+            </span>
+          )}
+          <div className="dash-welcome-text">
+            <p className="dash-eyebrow">
+              {user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
+            </p>
+            <h1>Welcome back, {user.name.split(" ")[0]}</h1>
           </div>
         </div>
 
-        <div className="dashboard-nav" role="tablist" aria-label="Dashboard sections">
+        <div className="dash-quota">
+          <div className="dash-quota-top">
+            <span>
+              <ShieldCheck size={14} aria-hidden="true" /> {limits.planLabel}
+            </span>
+            <span>
+              <strong>{activeListingCount}</strong>/{limits.maxListings} uploads · max{" "}
+              {limits.maxImagesPerListing} photos/item
+            </span>
+          </div>
+          <div className="dash-quota-bar" aria-hidden="true">
+            <i
+              style={{
+                width: `${Math.min(100, Math.round((activeListingCount / Math.max(1, limits.maxListings)) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="dash-actions">
+          {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
+            <Button className="dashboard-create-btn dash-create" asChild>
+              <Link to="/post">
+                <Plus size={17} />
+                Create listing
+              </Link>
+            </Button>
+          )}
+          {user.id && (
+            <Button variant="outline" className="dash-action" asChild>
+              <Link to="/seller/$id" params={{ id: user.id }}>
+                <StoreIcon size={16} />
+                My shop
+              </Link>
+            </Button>
+          )}
+          {user.role === "admin" && !isSuspended && (
+            <Button variant="outline" className="dash-action" asChild>
+              <Link to="/admin">
+                <Shield size={16} />
+                Admin
+              </Link>
+            </Button>
+          )}
+        </div>
+
+        <div className="dashboard-nav dash-tabs" role="tablist" aria-label="Dashboard sections">
           {["Overview", "My Listings"].map((t) => (
             <Button key={t} variant={tab === t ? "default" : "ghost"} onClick={() => setTab(t)}>
               {t}
@@ -366,25 +384,20 @@ export function DashboardPage() {
             onClick={() => setTab("Notifications")}
           >
             <Bell size={15} />
-            Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
+            Alerts{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
           </Button>
           <Button variant={tab === "Plans" ? "default" : "ghost"} onClick={() => setTab("Plans")}>
             <CreditCard size={15} />
             Plans
-          </Button>
-          {!isSuspended && (user.verificationStatus === "verified" || user.role === "admin") && (
-            <Button variant="ghost" asChild>
-              <Link to="/post">Create Listing</Link>
-            </Button>
-          )}
-          <Button variant="ghost" asChild>
-            <Link to="/profile">Profile</Link>
           </Button>
           <Button
             variant={tab === "Settings" ? "default" : "ghost"}
             onClick={() => setTab("Settings")}
           >
             Settings
+          </Button>
+          <Button variant="ghost" asChild>
+            <Link to="/profile">Profile</Link>
           </Button>
         </div>
       </section>
