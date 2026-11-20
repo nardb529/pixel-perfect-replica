@@ -7459,3 +7459,8 @@ html.dark .plan-card {
 .dash-cover .dash-eyebrow {
   opacity: 0.85;
 }
+
+/* Cards that were already shown do not replay their entrance animation */
+.listing-card.is-seen {
+  animation: none;
+}
