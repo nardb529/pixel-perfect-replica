@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
@@ -18,11 +18,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Welcome() {
-  const { triggerBuyerInstallPrompt, user, authLoading } = useCampus();
+  const { triggerBuyerInstallPrompt } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
-  const sellDestination =
-    !authLoading && user ? (user.role === "admin" ? "/admin" : "/post") : "/auth";
 
   useEffect(() => {
     void router.preloadRoute({ to: "/discover" }).catch(() => undefined);
@@ -51,31 +49,38 @@ function Welcome() {
       <div className="wel-sheet">
         <p className="wel-kicker">Ghana’s university campus marketplace</p>
         <h1>WELCOME</h1>
-        <p className="wel-tagline">
-          Buy and sell student products and campus services. Buyers need no account.
-        </p>
 
-        <div className="wel-actions">
-          <Button size="lg" className="wel-primary" asChild>
-            <Link to="/auth" search={{ mode: "login" } as never}>
-              Login
-            </Link>
+        <div className="wel-buyer">
+          <p className="wel-who">Looking to buy?</p>
+          <Button size="lg" className="wel-primary" onClick={handleExplore}>
+            Start browsing
+            <ArrowRight size={18} />
           </Button>
-          <Button variant="outline" size="lg" className="wel-secondary" asChild>
-            <Link to="/auth" search={{ mode: "signup" } as never}>
-              Sign Up
-            </Link>
-          </Button>
+          <p className="wel-note">
+            <Check size={14} />
+            No account, no login. Just browse and message sellers.
+          </p>
         </div>
 
-        <button type="button" className="wel-guest" onClick={handleExplore}>
-          Explore as guest
-          <ArrowRight size={16} />
-        </button>
-        <Link to={sellDestination} className="wel-sell">
-          Sell or offer a service
-          <ArrowUpRight size={15} />
-        </Link>
+        <div className="wel-divider" role="separator">
+          <span>Selling or offering a service?</span>
+        </div>
+
+        <div className="wel-seller">
+          <div className="wel-actions">
+            <Button variant="outline" size="lg" className="wel-secondary" asChild>
+              <Link to="/auth" search={{ mode: "login" } as never}>
+                Login
+              </Link>
+            </Button>
+            <Button variant="outline" size="lg" className="wel-secondary" asChild>
+              <Link to="/auth" search={{ mode: "signup" } as never}>
+                Sign Up
+              </Link>
+            </Button>
+          </div>
+          <p className="wel-note">Sellers and service providers need an account to post.</p>
+        </div>
       </div>
     </div>
   );
