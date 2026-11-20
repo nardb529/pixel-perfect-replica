@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCampus } from "./store";
 import { PageBanner } from "./banners";
+import { warmImages } from "@/lib/campus/imageCache";
 import {
   Shell,
   SearchBar,
@@ -43,6 +44,10 @@ const shortcuts = [
   { name: "Technology & Repairs", label: "Repairs", icon: Cpu, tone: "slate" },
   { name: "All", label: "All items", icon: LayoutGrid, tone: "indigo" },
 ];
+
+/** Remembers the last Products / Services results so switching tabs does not reload them. */
+const browseCache = new Map<string, { items: Listing[]; total: number; at: number }>();
+const BROWSE_FRESH_MS = 45_000;
 
 export function DiscoverPage() {
   const {
@@ -391,8 +396,10 @@ export function BrowsePage({
   const [maxPrice, setMaxPrice] = useState(initialMaxPrice || "any");
   const [sort, setSort] = useState("recent");
 
-  const [dbResults, setDbResults] = useState<Listing[]>([]);
-  const [dbTotal, setDbTotal] = useState(0);
+  const initialSig = `${university}|${initialQuery || ""}|${type}|${initialCategory || "All"}|${initialMaxPrice || "any"}|recent`;
+  const initialCached = browseCache.get(initialSig);
+  const [dbResults, setDbResults] = useState<Listing[]>(initialCached?.items ?? []);
+  const [dbTotal, setDbTotal] = useState(initialCached?.total ?? 0);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbSearchFailed, setDbSearchFailed] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -426,9 +433,19 @@ export function BrowsePage({
 
     if (!backendConfigured || !schemaReady) return;
     let active = true;
-    setDbLoading(true);
-    setDbSearchFailed(false);
     const effectiveOffset = filterChanged ? 0 : offset;
+    const cached = effectiveOffset === 0 ? browseCache.get(filterSignature) : undefined;
+    if (cached) {
+      setDbResults(cached.items);
+      setDbTotal(cached.total);
+      if (Date.now() - cached.at < BROWSE_FRESH_MS) {
+        setDbLoading(false);
+        setDbSearchFailed(false);
+        return;
+      }
+    }
+    setDbLoading(!cached);
+    setDbSearchFailed(false);
     const sortParam =
       sort === "low"
         ? "price_asc"
@@ -456,6 +473,10 @@ export function BrowsePage({
           if (!active) return;
           setDbResults((prev) => (effectiveOffset === 0 ? items : [...prev, ...items]));
           setDbTotal(totalCount);
+          if (effectiveOffset === 0) {
+            browseCache.set(filterSignature, { items, total: totalCount, at: Date.now() });
+            warmImages(items.map((l) => l.image));
+          }
           setDbLoading(false);
         })
         .catch(() => {
