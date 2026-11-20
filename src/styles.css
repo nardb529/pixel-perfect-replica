@@ -7202,3 +7202,230 @@ html.dark .me-menu {
     margin-right: auto;
   }
 }
+
+/* ---------- Swipeable product photos ---------- */
+.detail-gallery-wrap {
+  position: relative;
+}
+.detail-gallery {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-radius: 28px;
+  overscroll-behavior-x: contain;
+}
+.detail-gallery::-webkit-scrollbar {
+  display: none;
+}
+.detail-gallery .detail-image {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.detail-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.detail-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition:
+    width 0.2s ease,
+    background 0.2s ease;
+}
+.detail-dots i.on {
+  width: 20px;
+  background: #fff;
+}
+@media (max-width: 860px) {
+  .detail-gallery {
+    border-radius: 28px 28px 0 0;
+  }
+  .detail-gallery-wrap .detail-dots {
+    bottom: 38px;
+  }
+}
+
+/* ---------- Dashboard ---------- */
+.dash-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+.dash-cover {
+  height: 92px;
+  border-radius: 28px;
+  background:
+    radial-gradient(140px 90px at 15% 25%, rgba(255, 255, 255, 0.3), transparent 70%),
+    radial-gradient(180px 100px at 90% 90%, rgba(255, 255, 255, 0.2), transparent 70%),
+    linear-gradient(120deg, #2f55e6 0%, #5b3fd6 100%);
+}
+.dash-welcome {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: -52px;
+  padding: 0 8px;
+}
+.dash-avatar {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--accent);
+  border: 4px solid var(--background);
+  box-shadow: var(--shadow-float);
+}
+.dash-welcome-text {
+  min-width: 0;
+  padding-top: 30px;
+}
+.dash-eyebrow {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.dash-welcome-text h1 {
+  margin: 2px 0 0;
+  font-size: clamp(1.3rem, 5vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.dash-quota {
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 8px 24px rgba(30, 50, 120, 0.07);
+}
+html.dark .dash-quota {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.dash-quota-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.dash-quota-top span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.dash-quota-bar {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.dash-quota-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--violet));
+}
+.dash-actions {
+  display: flex;
+  gap: 10px;
+}
+.dash-create {
+  flex: 1;
+  height: 50px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.dash-action {
+  height: 50px;
+  border-radius: 999px;
+  padding: 0 18px;
+}
+.dash-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+}
+html.dark .dash-tabs {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.dash-tabs::-webkit-scrollbar {
+  display: none;
+}
+.dash-tabs > * {
+  flex-shrink: 0;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Dashboard cards: glass, lighter boxes */
+.stat,
+.manage-row,
+.activity-row,
+.plan-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 8px 24px rgba(30, 50, 120, 0.07);
+}
+html.dark .stat,
+html.dark .manage-row,
+html.dark .activity-row,
+html.dark .plan-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+.stat strong {
+  font-size: 1.6rem;
+}
+@media (min-width: 861px) {
+  .dash-hero {
+    max-width: 1100px;
+  }
+}
+
+/* Delete account sits last on the profile page */
+.me-danger-zone {
+  margin: 8px auto 20px;
+  max-width: 640px;
+}
