@@ -153,7 +153,15 @@ export function DetailPage({ id }: { id: string }) {
       <PageBackButton fallbackTo="/discover" label="Back" />
 
       <div className="detail-grid">
-        <div className="surface-panel detail-media-panel">
+        <div className="detail-media-panel">
+          <button
+            type="button"
+            className="detail-float-btn"
+            onClick={share}
+            aria-label="Share this listing"
+          >
+            <Share2 size={18} />
+          </button>
           {images[imageIndex] ? (
             <img
               className="detail-image"
@@ -186,7 +194,7 @@ export function DetailPage({ id }: { id: string }) {
           )}
         </div>
 
-        <div className="surface-panel detail-content curve-accent">
+        <div className="detail-content">
           <div className="detail-kicker">
             <span>{listing.category}</span>
             <span>·</span>
