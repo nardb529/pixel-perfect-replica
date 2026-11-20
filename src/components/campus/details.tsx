@@ -59,6 +59,7 @@ export function DetailPage({ id }: { id: string }) {
   const [reason, setReason] = useState<string>(REPORT_REASONS[1] ?? "Misleading listing");
   const [reportDescription, setReportDescription] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
+  const galleryRef = useRef<HTMLDivElement>(null);
   const viewedId = useRef<string | null>(null);
   const hasCachedRef = useRef<boolean>(Boolean(cachedListing));
   hasCachedRef.current = Boolean(cachedListing);
@@ -66,6 +67,7 @@ export function DetailPage({ id }: { id: string }) {
   useEffect(() => {
     let active = true;
     setImageIndex(0);
+    galleryRef.current?.scrollTo({ left: 0 });
     setFetchedListing(null);
 
     if (backendConfigured) {
@@ -162,18 +164,41 @@ export function DetailPage({ id }: { id: string }) {
           >
             <Share2 size={18} />
           </button>
-          {images[imageIndex] ? (
-            <img
-              className="detail-image"
-              src={images[imageIndex]}
-              alt={listing.title}
-              referrerPolicy="no-referrer"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              width={1024}
-              height={1024}
-            />
+          {images.length > 0 ? (
+            <div className="detail-gallery-wrap">
+              <div
+                className="detail-gallery"
+                ref={galleryRef}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const next = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+                  if (next !== imageIndex) setImageIndex(next);
+                }}
+              >
+                {images.map((im, i) => (
+                  <img
+                    key={im + i}
+                    className="detail-image"
+                    src={im}
+                    alt={i === 0 ? listing.title : `${listing.title} photo ${i + 1}`}
+                    referrerPolicy="no-referrer"
+                    loading={i === 0 ? "eager" : "lazy"}
+                    fetchPriority={i === 0 ? "high" : "auto"}
+                    decoding="async"
+                    width={1024}
+                    height={1024}
+                    draggable={false}
+                  />
+                ))}
+              </div>
+              {images.length > 1 && (
+                <div className="detail-dots" aria-hidden="true">
+                  {images.map((_, i) => (
+                    <i key={i} className={i === imageIndex ? "on" : ""} />
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="detail-image listing-image-fallback">No photo provided</div>
           )}
@@ -185,7 +210,11 @@ export function DetailPage({ id }: { id: string }) {
                   key={i}
                   variant={imageIndex === i ? "default" : "outline"}
                   aria-label={`View image ${i + 1}`}
-                  onClick={() => setImageIndex(i)}
+                  onClick={() => {
+                    const el = galleryRef.current;
+                    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+                    setImageIndex(i);
+                  }}
                 >
                   <img src={im} alt={`${listing.title} view ${i + 1}`} decoding="async" />
                 </Button>
