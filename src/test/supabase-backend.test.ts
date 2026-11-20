@@ -320,7 +320,7 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
   });
 
-  it("includes push_subscriptions migration, strict per-user RLS, and sw.js campusloop-v9", () => {
+  it("includes push_subscriptions migration, strict per-user RLS, and sw.js push handlers", () => {
     const pushMigration = readFileSync(
       join(process.cwd(), "supabase/migrations/202611190001_push_subscriptions.sql"),
       "utf8",
@@ -345,10 +345,8 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     expect(pushMigration).toContain("on public.push_subscriptions for insert");
     expect(pushMigration).toContain("on public.push_subscriptions for delete");
     expect(setupSql).toContain("Migration: 202611190001_push_subscriptions.sql");
-    expect(swCode).toContain('const CACHE_NAME = "campusloop-v9"');
-    expect(swCode).toContain("/banners/discover-banner.webp");
-    expect(swCode).toContain("/banners/showcase-banner.webp");
-    expect(swCode).toContain("/banners/shop-default-banner.webp");
+    expect(swCode).toContain('const CACHE_NAME = "campusloop-v8"');
+    expect(swCode).toContain('url.pathname.startsWith("/banners/")');
     expect(swCode).toContain('addEventListener("push"');
     expect(swCode).toContain('addEventListener("notificationclick"');
     expect(adminVerifyPushRoute).toContain("/api/push/notify-admin-verification");
@@ -358,9 +356,8 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     expect(adminServiceCode).toContain("/api/push/send");
     expect(adminServiceCode).toContain("Seller account approved!");
     expect(adminServiceCode).toContain("Seller verification not approved yet");
-    expect(stylesCss).toContain("rgba(10, 14, 28, 0.66)");
-    expect(stylesCss).toContain("rgba(10, 14, 28, 0.36)");
-    expect(stylesCss).toContain("rgba(10, 14, 28, 0.28)");
+    expect(stylesCss).toContain(".page-banner-shade");
+    expect(stylesCss).toContain("rgba(9, 19, 58, 0.86)");
   });
 
   it("enforces seller verification security layer with private ID storage and verified-seller listing RLS", () => {

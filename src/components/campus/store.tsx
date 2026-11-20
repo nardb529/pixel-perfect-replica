@@ -22,7 +22,7 @@ import {
   resetVisitorSessionId,
 } from "@/lib/supabase/client";
 import { clearAnalyticsSessionCache } from "@/services/analyticsService";
-import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
+import type { LiveSelfieChecks, VerificationChecksPayload } from "@/lib/campus/idVerification";
 import {
   getPushNotificationState,
   removePushSubscriptionForCurrentUser,
@@ -77,7 +77,7 @@ export type CampusUser = {
   verificationPhotoConfirmed?: boolean | undefined;
   verificationSubmittedAt?: string | null | undefined;
   verificationNote?: string | null | undefined;
-  verificationChecks?: VerificationChecksPayload | null | undefined;
+  verificationChecks?: VerificationChecksPayload | LiveSelfieChecks | null | undefined;
   isSuspended?: boolean | undefined;
   subscriptionTier?: SubscriptionTier | undefined;
   subscriptionStatus?: SubscriptionStatus | undefined;

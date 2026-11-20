@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
+  AlignLeft,
   Bell,
   BookOpen,
   Compass,
@@ -14,14 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/campus/data";
-import {
-  HeroAmbient,
-  HeroBannerBackdrop,
-  PageBackButton,
-  PageIntro,
-  SafariPageMenuIcon,
-  Shell,
-} from "./shared";
+import { PageBanner } from "./banners";
+import { PageBackButton, PageIntro, Shell } from "./shared";
 import { useCampus } from "./store";
 
 export function PrivacyPage() {
@@ -30,18 +25,13 @@ export function PrivacyPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel has-hero-banner curve-accent">
-          <HeroBannerBackdrop
-            src="/banners/showcase-banner.webp"
-            alt="CampusLoop campus marketplace showcase"
-          />
-          <HeroAmbient />
+        <PageBanner banner="products">
           <PageIntro
             eyebrow="Privacy Policy"
             title={`How ${BRAND} handles your data`}
             text="Built for Ghanaian university students with simple, transparent data practices."
           />
-        </section>
+        </PageBanner>
 
         <div className="legal-grid">
           <article className="surface-panel">
@@ -146,18 +136,13 @@ export function TermsPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel has-hero-banner curve-accent">
-          <HeroBannerBackdrop
-            src="/banners/showcase-banner.webp"
-            alt="CampusLoop campus marketplace showcase"
-          />
-          <HeroAmbient />
+        <PageBanner banner="products">
           <PageIntro
             eyebrow="Terms of Use"
             title={`${BRAND} community rules`}
             text="Clear guidelines to keep trading fast, honest, and safe across every campus."
           />
-        </section>
+        </PageBanner>
 
         <div className="legal-grid">
           <article className="surface-panel">
@@ -243,12 +228,7 @@ export function ManualPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel has-hero-banner curve-accent">
-          <HeroBannerBackdrop
-            src="/banners/showcase-banner.webp"
-            alt="CampusLoop campus marketplace showcase"
-          />
-          <HeroAmbient />
+        <PageBanner banner="products">
           <PageIntro
             eyebrow="User Manual"
             title={`Getting the most out of ${BRAND}`}
@@ -266,7 +246,7 @@ export function ManualPage() {
               Switch to {theme === "dark" ? "Light" : "Dark"} mode
             </Button>
           </div>
-        </section>
+        </PageBanner>
 
         <div className="legal-grid">
           <article className="surface-panel">
@@ -324,7 +304,7 @@ export function ManualPage() {
             <ol className="manual-steps">
               <li>
                 <strong>iPhone / iPad (Safari):</strong> Tap{" "}
-                <SafariPageMenuIcon className="inline-icon" />, tap Share, then tap{" "}
+                <AlignLeft size={14} className="inline-icon" />, tap Share, then tap{" "}
                 <strong>Add to Home Screen</strong>.
               </li>
               <li>

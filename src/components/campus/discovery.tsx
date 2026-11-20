@@ -574,6 +574,7 @@ export function BrowsePage({
             <Button
               key={c}
               className="filter-chip"
+              aria-pressed={c === category}
               variant={c === category ? "default" : "outline"}
               onClick={() => setCategory(c)}
             >

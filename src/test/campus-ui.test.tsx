@@ -1,11 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  AnimatedSelect,
-  ListingCard,
-  PageBackButton,
-  SafariPageMenuIcon,
-} from "@/components/campus/shared";
+import { AnimatedSelect, ListingCard, PageBackButton } from "@/components/campus/shared";
 import { CampusProvider, useCampus } from "@/components/campus/store";
 import {
   TECHNICAL_ISSUE_MESSAGE,
@@ -164,8 +159,7 @@ describe("ListingCard actions", () => {
 
     expect(screen.getByText(serviceFixture.title)).toBeInTheDocument();
     expect(screen.getByText("All Universities")).toBeInTheDocument();
-    expect(screen.queryByText(serviceFixture.description)).not.toBeInTheDocument();
-    expect(screen.queryByText(serviceFixture.seller)).not.toBeInTheDocument();
+    expect(screen.getByText(serviceFixture.seller)).toBeInTheDocument();
 
     const contactBtn = screen.getByRole("button", { name: "Contact" });
     expect(contactBtn).toBeInTheDocument();
@@ -529,23 +523,23 @@ describe("Marketplace updates: selective errors, filters, quotas, subscriptions 
         <DiscoverPage />
       </CampusProvider>,
     );
-    const discoverImg = discoverContainer.querySelector(".hero-banner-media img");
-    expect(discoverImg).toHaveAttribute("src", "/banners/discover-banner.webp");
+    const discoverImg = discoverContainer.querySelector(".page-banner-media");
+    expect(discoverImg).toHaveAttribute("src", "/banners/discover.jpg");
 
     const { container: browseContainer } = render(
       <CampusProvider>
         <BrowsePage type="product" />
       </CampusProvider>,
     );
-    const browseImg = browseContainer.querySelector(".hero-banner-media img");
-    expect(browseImg).toHaveAttribute("src", "/banners/showcase-banner.webp");
+    const browseImg = browseContainer.querySelector(".page-banner-media");
+    expect(browseImg).toHaveAttribute("src", "/banners/products.jpg");
 
     const { container: accountContainer } = render(
       <CampusProvider>
         <ProfilePage />
       </CampusProvider>,
     );
-    expect(accountContainer.querySelector(".hero-banner-media")).toBeNull();
+    expect(accountContainer.querySelector(".page-banner-media")).toBeNull();
 
     function DashboardHarness() {
       const { setUser } = useCampus();
@@ -578,8 +572,8 @@ describe("Marketplace updates: selective errors, filters, quotas, subscriptions 
       </CampusProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Sign in seller" }));
-    expect(dashContainer.querySelector(".dashboard-hero-panel")).toBeInTheDocument();
-    expect(dashContainer.querySelector(".hero-banner-media")).toBeNull();
+    expect(dashContainer.querySelector(".dash-hero")).toBeInTheDocument();
+    expect(dashContainer.querySelector(".page-banner-media")).toBeNull();
 
     function ShopBannerHarness() {
       const { setListings } = useCampus();
@@ -604,27 +598,24 @@ describe("Marketplace updates: selective errors, filters, quotas, subscriptions 
       </CampusProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Load shop" }));
-    const shopImg = shopContainer.querySelector(".hero-banner-media img");
-    expect(shopImg).toHaveAttribute("src", "/banners/shop-default-banner.webp");
+    const shopImg = shopContainer.querySelector(".page-banner-media");
+    expect(shopImg).toHaveAttribute("src", "/banners/shop-default.jpg");
   });
 
-  it("renders Safari 3-bar Page Menu SVG icon without three-dot text in Safari guides", () => {
+  it("renders Safari guide and active browse filter chips cleanly", () => {
     const { container } = render(
       <CampusProvider>
         <ManualPage />
       </CampusProvider>,
     );
-    expect(container.querySelector(".safari-menu-badge svg")).toBeInTheDocument();
-
-    const { container: iconContainer } = render(<SafariPageMenuIcon />);
-    expect(iconContainer.querySelectorAll("line")).toHaveLength(3);
+    expect(container.querySelector(".manual-steps svg.inline-icon")).toBeInTheDocument();
 
     const { container: browseFilterContainer } = render(
       <CampusProvider>
         <BrowsePage type="product" />
       </CampusProvider>,
     );
-    const allChip = browseFilterContainer.querySelector('.filter-chip[data-active="true"]');
+    const allChip = browseFilterContainer.querySelector('.filter-chip[aria-pressed="true"]');
     expect(allChip).toHaveTextContent("All");
   });
 });

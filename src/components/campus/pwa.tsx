@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import {
+  AlignLeft,
   BellRing,
   BookmarkCheck,
   CheckCircle2,
@@ -19,7 +20,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BRAND } from "@/lib/campus/data";
-import { SafariPageMenuIcon } from "./shared";
 import { useCampus } from "./store";
 
 type DeviceTab = "ios" | "android" | "desktop";
@@ -39,8 +39,6 @@ export function OnboardingPrompts() {
     dismissSellerPrompts,
     manualInstallOpen,
     closeInstallPrompt,
-    notifPromptOpen,
-    closeNotifPrompt,
     pushState,
     refreshPushState,
     requestAppNotifications,
@@ -65,7 +63,7 @@ export function OnboardingPrompts() {
 
   const showSellerNotif =
     Boolean(user) && sellerPostAuthStage === "notifications" && pathname === "/dashboard";
-  const showNotifDialog = showSellerNotif || notifPromptOpen;
+  const showNotifDialog = showSellerNotif;
 
   const showSellerInstall =
     Boolean(user) &&
@@ -86,7 +84,6 @@ export function OnboardingPrompts() {
   }
 
   function handleCloseNotif(enabled: boolean) {
-    if (notifPromptOpen) closeNotifPrompt();
     if (showSellerNotif) completeNotificationStep(enabled);
   }
 
@@ -359,7 +356,7 @@ export function OnboardingPrompts() {
                       <div className="install-step">
                         <span className="step-num">1</span>
                         <p>
-                          Tap <SafariPageMenuIcon className="inline-icon" /> in your Safari toolbar
+                          Tap <AlignLeft size={14} className="inline-icon" /> in your Safari toolbar
                         </p>
                       </div>
                       <div className="install-step">
@@ -636,7 +633,7 @@ export function InstallGate() {
               <p>
                 {isIOS ? (
                   <>
-                    Tap <SafariPageMenuIcon className="inline-icon" /> in Safari, tap{" "}
+                    Tap <AlignLeft size={14} className="inline-icon" /> in Safari, tap{" "}
                     <Share size={14} className="inline-icon" /> <strong>Share</strong>, then choose{" "}
                     <PlusSquare size={14} className="inline-icon" />{" "}
                     <strong>Add to Home Screen</strong>.
@@ -654,7 +651,7 @@ export function InstallGate() {
             <div className="install-step">
               <span className="step-num">1</span>
               <p>
-                Tap <SafariPageMenuIcon className="inline-icon" /> in your Safari toolbar
+                Tap <AlignLeft size={14} className="inline-icon" /> in your Safari toolbar
               </p>
             </div>
             <div className="install-step">

@@ -27,6 +27,27 @@ const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, verification_checks, subscript
 const PUBLIC_SELLER_COLUMNS =
   "id, full_name, username, profile_image, bio, account_type, primary_university_id, verification_status, preferred_contact_method, public_contact_handle, is_suspended, created_at";
 
+async function notifyAdminsOfVerificationSubmission(
+  supabase: ReturnType<typeof requireSupabase>,
+): Promise<void> {
+  if (typeof fetch !== "function") return;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) return;
+    await fetch("/api/push/notify-admin-verification", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: "{}",
+    }).catch(() => undefined);
+  } catch {
+    // Non-blocking: verification submission succeeds even if push notification dispatch fails
+  }
+}
+
 export interface UpdateProfileInput {
   full_name?: string | undefined;
   username?: string | undefined;
@@ -334,10 +355,12 @@ export const profileService = {
           .select(PROFILE_COLUMNS_BASE)
           .single();
         if (fallback.error) throw fallback.error;
+        void notifyAdminsOfVerificationSubmission(supabase);
         return fallback.data as ProfileRecord;
       }
       throw error;
     }
+    void notifyAdminsOfVerificationSubmission(supabase);
     return data as ProfileRecord;
   },
   /**
@@ -380,6 +403,7 @@ export const profileService = {
       .select(PROFILE_COLUMNS)
       .single();
     if (error) throw error;
+    void notifyAdminsOfVerificationSubmission(supabase);
     return data as ProfileRecord;
   },
 
