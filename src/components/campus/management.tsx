@@ -306,24 +306,25 @@ export function DashboardPage() {
       <PageBackButton fallbackTo="/discover" label="Back" />
 
       <section className="dash-hero">
-        <div className="dash-cover" aria-hidden="true" />
-        <div className="dash-welcome">
-          {user.avatar && /^https?:\/\//.test(user.avatar) ? (
-            <img className="dash-avatar" src={user.avatar} alt="" decoding="async" />
-          ) : (
-            <span className="dash-avatar">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")}
-            </span>
-          )}
-          <div className="dash-welcome-text">
-            <p className="dash-eyebrow">
-              {user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
-            </p>
-            <h1>Welcome back, {user.name.split(" ")[0]}</h1>
+        <div className="dash-cover">
+          <div className="dash-welcome">
+            {user.avatar && /^https?:\/\//.test(user.avatar) ? (
+              <img className="dash-avatar" src={user.avatar} alt="" decoding="async" />
+            ) : (
+              <span className="dash-avatar">
+                {user.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
+            )}
+            <div className="dash-welcome-text">
+              <p className="dash-eyebrow">
+                {user.role === "admin" ? "Administrator & Seller studio" : "Seller studio"}
+              </p>
+              <h1>Welcome back, {user.name.split(" ")[0]}</h1>
+            </div>
           </div>
         </div>
 
