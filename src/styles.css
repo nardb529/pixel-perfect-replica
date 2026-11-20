@@ -6869,3 +6869,22 @@ html:not(.dark) .app-header {
 .auth-inner {
   border-radius: 32px;
 }
+
+/* ---------- Delete account ---------- */
+.delete-account-btn {
+  color: var(--destructive);
+}
+.delete-account-label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+.delete-account-input {
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 0 14px;
+  font-size: 16px;
+}
