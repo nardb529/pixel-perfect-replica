@@ -23,6 +23,8 @@ import {
   Store as StoreIcon,
   BellRing,
   BellOff,
+  ImagePlus,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,12 +33,14 @@ import { useCampus } from "./store";
 import {
   Shell,
   HeroAmbient,
+  HeroBannerBackdrop,
   SectionTitle,
   ListingCard,
   Empty,
   AnimatedSelect,
   PagePendingFallback,
   PageBackButton,
+  SafariPageMenuIcon,
 } from "./shared";
 import {
   TECHNICAL_ISSUE_MESSAGE,
@@ -79,7 +83,9 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
+  const [shopBannerDraft, setShopBannerDraft] = useState<string | null | undefined>(undefined);
   const [collectionTab, setCollectionTab] = useState<"saved" | "liked">("saved");
   const [shopTab, setShopTab] = useState<"all" | "product" | "service">("all");
   const [shopQuery, setShopQuery] = useState("");
@@ -106,19 +112,23 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     async function loadSeller() {
       try {
         let targetUserId = sellerId!;
-        let pub = await profileService.getPublicSellerProfile(targetUserId);
+        let [pub, sellerItems] = await Promise.all([
+          profileService.getPublicSellerProfile(targetUserId),
+          listingService.getListingsBySeller(targetUserId),
+        ]);
         if (!pub) {
           const fallbackListing = await listingService.getListingById(sellerId!);
           if (fallbackListing?.sellerId) {
             targetUserId = fallbackListing.sellerId;
-            pub = await profileService.getPublicSellerProfile(targetUserId);
+            [pub, sellerItems] = await Promise.all([
+              profileService.getPublicSellerProfile(targetUserId),
+              listingService.getListingsBySeller(targetUserId),
+            ]);
           }
         }
         if (!active) return;
         setRemoteProfile(pub);
         if (pub) {
-          const sellerItems = await listingService.getListingsBySeller(pub.id);
-          if (!active) return;
           setRemoteListings(sellerItems);
           const matchedUni = dbUniversitiesRef.current.find(
             (u) => u.id === pub.primary_university_id,
@@ -183,6 +193,10 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     listing?.university ||
     "Ghana Campus";
 
+  const isOwnShop = Boolean(
+    sellerId && user?.id && (sellerId === user.id || remoteProfile?.id === user.id),
+  );
+
   const profile = sellerId
     ? remoteProfile
       ? {
@@ -194,6 +208,9 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
           contact: remoteProfile.preferred_contact_method || "WhatsApp",
           contactDetails: remoteProfile.public_contact_handle || undefined,
           avatar: remoteProfile.profile_image || undefined,
+          bannerImage: isOwnShop
+            ? (user?.bannerImage ?? remoteProfile.banner_image ?? undefined)
+            : (remoteProfile.banner_image ?? undefined),
           verificationStatus: remoteProfile.verification_status,
         }
       : publicOwner || {
@@ -204,11 +221,15 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
           contact: listing!.contactMethod || "WhatsApp",
           contactDetails: listing!.contact,
           avatar: undefined,
+          bannerImage: undefined,
           verificationStatus: listing!.verificationStatus,
         }
     : user;
 
   const safeProfileAvatar = isSafeMediaUrl(profile?.avatar) ? profile?.avatar : undefined;
+  const resolvedShopBanner = isSafeMediaUrl(profile?.bannerImage)
+    ? profile!.bannerImage!
+    : "/banners/shop-default-banner.webp";
 
   const active = sellerId
     ? remoteListings.length > 0
@@ -276,6 +297,24 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     }
   }
 
+  async function handleShopBannerSelect(file?: File) {
+    if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") return;
+    if (!backendConfigured) {
+      toast.error(TECHNICAL_ISSUE_MESSAGE);
+      return;
+    }
+    setUploadingBanner(true);
+    try {
+      const publicUrl = await profileService.uploadShopBanner(file);
+      setShopBannerDraft(publicUrl);
+      toast.success("Shop banner uploaded — save profile to publish");
+    } catch (err) {
+      toast.error(toUserSafeErrorMessage(err));
+    } finally {
+      setUploadingBanner(false);
+    }
+  }
+
   async function handleEnablePush() {
     setUpdatingPush(true);
     try {
@@ -332,6 +371,8 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       const primaryUni = dbUniversities.find(
         (u) => u.short_name === nextUni || u.university_name === nextUni,
       );
+      const nextBanner =
+        shopBannerDraft !== undefined ? shopBannerDraft : (user.bannerImage ?? null);
       await profileService.updateMyProfile({
         full_name: nextName,
         username: nextUsername || undefined,
@@ -341,7 +382,11 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
         whatsapp_number: nextContact === "WhatsApp" ? nextDetails || null : user.whatsappNumber,
         phone_number: nextContact !== "Email" ? nextDetails || null : user.phoneNumber,
         profile_image: avatar ?? user.avatar ?? null,
+        banner_image: nextBanner,
       });
+      if (isOwnShop) {
+        setRemoteProfile((prev) => (prev ? { ...prev, banner_image: nextBanner } : prev));
+      }
 
       const affiliationNames = Array.from(new Set([nextUni, ...selectedEditAffiliations]));
       const rows = affiliationNames
@@ -379,7 +424,17 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     <Shell>
       <PageBackButton fallbackTo="/discover" label="Back" />
 
-      <section className="surface-panel hero-panel profile-hero-panel curve-accent">
+      <section
+        className={`surface-panel hero-panel profile-hero-panel curve-accent ${
+          sellerId ? "has-hero-banner shop-hero-banner" : ""
+        }`.trim()}
+      >
+        {sellerId && (
+          <HeroBannerBackdrop
+            src={resolvedShopBanner}
+            alt={`${profile?.name || "Seller"}’s Shop banner`}
+          />
+        )}
         <HeroAmbient />
         <div className="profile-top">
           <div className="profile-identity-row">
@@ -430,17 +485,18 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
               </small>
             </div>
           </div>
-          {user && !sellerId && (
+          {user && (!sellerId || isOwnShop) && (
             <Button
               variant="outline"
               className="profile-edit-btn"
               onClick={() => {
                 setAvatar(user.avatar);
+                setShopBannerDraft(user.bannerImage ?? null);
                 setEditing(true);
               }}
             >
               <Pencil size={15} />
-              Edit profile
+              {isOwnShop ? "Edit shop banner" : "Edit profile"}
             </Button>
           )}
         </div>
@@ -692,9 +748,9 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
             {isIOS && (
               <div className="rounded-xl border border-border/80 bg-muted/40 p-3 text-xs leading-relaxed text-foreground">
-                <strong>iPhone guide:</strong> Tap <strong>•••</strong> in Safari, tap{" "}
-                <strong>Share</strong>, choose <strong>Add to Home Screen</strong>, open CampusLoop
-                from your Home Screen, and tap <strong>Turn on notifications</strong> (
+                <strong>iPhone guide:</strong> Tap <SafariPageMenuIcon className="inline-icon" /> in
+                Safari, tap <strong>Share</strong>, choose <strong>Add to Home Screen</strong>, open
+                CampusLoop from your Home Screen, and tap <strong>Turn on notifications</strong> (
                 <strong>iOS 16.4 or later</strong> is required).
               </div>
             )}
@@ -856,6 +912,56 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
             {isSafeMediaUrl(avatar) && (
               <img className="profile-avatar mb-3" src={avatar} alt="Your new profile photo" />
             )}
+
+            <div className="form-field shop-banner-editor">
+              <span>Shop banner image</span>
+              <div className="shop-banner-preview">
+                <img
+                  src={
+                    isSafeMediaUrl(
+                      shopBannerDraft !== undefined ? shopBannerDraft : user?.bannerImage,
+                    )
+                      ? (shopBannerDraft !== undefined ? shopBannerDraft : user?.bannerImage)!
+                      : "/banners/shop-default-banner.webp"
+                  }
+                  alt="Shop banner preview"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="shop-banner-caption">
+                  {(shopBannerDraft !== undefined ? shopBannerDraft : user?.bannerImage)
+                    ? "Custom shop banner"
+                    : "Default shop banner"}
+                </span>
+              </div>
+              <div className="shop-banner-actions">
+                <label className="profile-upload-row cursor-pointer">
+                  <ImagePlus size={15} />
+                  <span>{uploadingBanner ? "Uploading banner..." : "Upload custom banner"}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadingBanner}
+                    onChange={(e) => void handleShopBannerSelect(e.target.files?.[0])}
+                  />
+                </label>
+                {(shopBannerDraft !== undefined ? shopBannerDraft : user?.bannerImage) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingBanner}
+                    onClick={() => {
+                      setShopBannerDraft(null);
+                      toast.info("Switched back to default shop banner — save profile to apply");
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    Stick to default
+                  </Button>
+                )}
+              </div>
+            </div>
             <div className="form-grid">
               <label className="form-field">
                 <span>Display name</span>
@@ -927,7 +1033,11 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                 />
               </label>
             </div>
-            <Button type="submit" className="w-full" disabled={savingProfile || uploadingAvatar}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={savingProfile || uploadingAvatar || uploadingBanner}
+            >
               {savingProfile ? "Saving..." : "Save profile"}
             </Button>
           </form>

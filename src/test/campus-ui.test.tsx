@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AnimatedSelect, ListingCard, PageBackButton } from "@/components/campus/shared";
+import {
+  AnimatedSelect,
+  ListingCard,
+  PageBackButton,
+  SafariPageMenuIcon,
+} from "@/components/campus/shared";
 import { CampusProvider, useCampus } from "@/components/campus/store";
 import {
   TECHNICAL_ISSUE_MESSAGE,
@@ -42,6 +47,7 @@ vi.mock("@tanstack/react-router", async () => {
         </a>
       );
     },
+    Navigate: () => null,
     useNavigate: () => vi.fn(),
     useRouter: () => ({ invalidate: vi.fn(), preloadRoute: vi.fn() }),
     useRouterState: () => "/discover",
@@ -51,7 +57,9 @@ vi.mock("@tanstack/react-router", async () => {
 import { AdminPage } from "@/components/campus/adminConsole";
 import { AuthPage } from "@/components/campus/authPage";
 import { DetailPage } from "@/components/campus/details";
-import { DiscoverPage } from "@/components/campus/discovery";
+import { BrowsePage, DiscoverPage } from "@/components/campus/discovery";
+import { ManualPage } from "@/components/campus/legal";
+import { DashboardPage } from "@/components/campus/management";
 import { ProfilePage } from "@/components/campus/profiles";
 import {
   SellerStatusIndicator,
@@ -513,5 +521,110 @@ describe("Marketplace updates: selective errors, filters, quotas, subscriptions 
 
     // Verify Ghana Data Protection Act copy compiles cleanly in verification module
     expect(typeof SellerVerificationCard).toBe("function");
+  });
+
+  it("renders banner images on Discover, Browse, Legal, and Seller Shop (default fallback), while omitting them on Account & Dashboard", () => {
+    const { container: discoverContainer } = render(
+      <CampusProvider>
+        <DiscoverPage />
+      </CampusProvider>,
+    );
+    const discoverImg = discoverContainer.querySelector(".hero-banner-media img");
+    expect(discoverImg).toHaveAttribute("src", "/banners/discover-banner.webp");
+
+    const { container: browseContainer } = render(
+      <CampusProvider>
+        <BrowsePage type="product" />
+      </CampusProvider>,
+    );
+    const browseImg = browseContainer.querySelector(".hero-banner-media img");
+    expect(browseImg).toHaveAttribute("src", "/banners/showcase-banner.webp");
+
+    const { container: accountContainer } = render(
+      <CampusProvider>
+        <ProfilePage />
+      </CampusProvider>,
+    );
+    expect(accountContainer.querySelector(".hero-banner-media")).toBeNull();
+
+    function DashboardHarness() {
+      const { setUser } = useCampus();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              setUser({
+                id: "seller-ama",
+                name: "Ama Boateng",
+                email: "ama@knust.edu.gh",
+                university: "KNUST",
+                capability: "Product Seller",
+                bio: "",
+                contact: "WhatsApp",
+              })
+            }
+          >
+            Sign in seller
+          </button>
+          <DashboardPage />
+        </>
+      );
+    }
+
+    const { container: dashContainer } = render(
+      <CampusProvider>
+        <DashboardHarness />
+      </CampusProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Sign in seller" }));
+    expect(dashContainer.querySelector(".dashboard-hero-panel")).toBeInTheDocument();
+    expect(dashContainer.querySelector(".hero-banner-media")).toBeNull();
+
+    function ShopBannerHarness() {
+      const { setListings } = useCampus();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              setListings([{ ...productFixture, sellerId: "seller-ama", seller: "Ama Boateng" }])
+            }
+          >
+            Load shop
+          </button>
+          <ProfilePage sellerId="seller-ama" />
+        </>
+      );
+    }
+
+    const { container: shopContainer } = render(
+      <CampusProvider>
+        <ShopBannerHarness />
+      </CampusProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Load shop" }));
+    const shopImg = shopContainer.querySelector(".hero-banner-media img");
+    expect(shopImg).toHaveAttribute("src", "/banners/shop-default-banner.webp");
+  });
+
+  it("renders Safari 3-bar Page Menu SVG icon without three-dot text in Safari guides", () => {
+    const { container } = render(
+      <CampusProvider>
+        <ManualPage />
+      </CampusProvider>,
+    );
+    expect(container.querySelector(".safari-menu-badge svg")).toBeInTheDocument();
+
+    const { container: iconContainer } = render(<SafariPageMenuIcon />);
+    expect(iconContainer.querySelectorAll("line")).toHaveLength(3);
+
+    const { container: browseFilterContainer } = render(
+      <CampusProvider>
+        <BrowsePage type="product" />
+      </CampusProvider>,
+    );
+    const allChip = browseFilterContainer.querySelector('.filter-chip[data-active="true"]');
+    expect(allChip).toHaveTextContent("All");
   });
 });

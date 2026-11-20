@@ -16,6 +16,7 @@ import type {
   UniversityRecord,
 } from "@/lib/supabase/database.types";
 import { UserInputError, isSafeMediaUrl, type Listing } from "@/lib/campus/data";
+import { universityService } from "./universityService";
 
 export interface SearchListingsParams {
   universityFilter?: string | null | undefined;
@@ -208,11 +209,14 @@ export const listingService = {
     if (!data) return null;
 
     const sellerId = String(data["seller_id"]);
-    const { data: sellerPublic } = await client
-      .from("public_seller_profiles")
-      .select("id, full_name, username, verification_status, primary_university_id")
-      .eq("id", sellerId)
-      .maybeSingle();
+    const [{ data: sellerPublic }, activeUnis] = await Promise.all([
+      client
+        .from("public_seller_profiles")
+        .select("id, full_name, username, verification_status, primary_university_id")
+        .eq("id", sellerId)
+        .maybeSingle(),
+      universityService.listActiveUniversities().catch(() => [] as UniversityRecord[]),
+    ]);
 
     if (!sellerPublic) {
       const viewer = await getSessionUser(client);
@@ -233,13 +237,18 @@ export const listingService = {
 
     let primaryUniName = "Ghana Campus";
     if (sellerPublic?.["primary_university_id"]) {
-      const { data: uniRow } = await client
-        .from("universities")
-        .select("short_name, university_name")
-        .eq("id", sellerPublic["primary_university_id"])
-        .maybeSingle();
-      if (uniRow) {
-        primaryUniName = String(uniRow["short_name"] || uniRow["university_name"]);
+      const cachedUni = activeUnis.find((u) => u.id === sellerPublic["primary_university_id"]);
+      if (cachedUni) {
+        primaryUniName = String(cachedUni.short_name || cachedUni.university_name);
+      } else {
+        const { data: uniRow } = await client
+          .from("universities")
+          .select("short_name, university_name")
+          .eq("id", sellerPublic["primary_university_id"])
+          .maybeSingle();
+        if (uniRow) {
+          primaryUniName = String(uniRow["short_name"] || uniRow["university_name"]);
+        }
       }
     }
 
@@ -477,7 +486,7 @@ export const listingService = {
     const user = await getSessionUser(supabase);
     if (!user) throw new Error("Sign in to upload images.");
 
-    const optimized = await prepareImageForUpload(file, 1400, 0.84);
+    const optimized = await prepareImageForUpload(file, 1080, 0.82);
     const mimeToExt: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/png": "png",

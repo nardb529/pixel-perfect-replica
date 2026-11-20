@@ -14,7 +14,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/campus/data";
-import { HeroAmbient, PageBackButton, PageIntro, Shell } from "./shared";
+import {
+  HeroAmbient,
+  HeroBannerBackdrop,
+  PageBackButton,
+  PageIntro,
+  SafariPageMenuIcon,
+  Shell,
+} from "./shared";
 import { useCampus } from "./store";
 
 export function PrivacyPage() {
@@ -23,7 +30,11 @@ export function PrivacyPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel curve-accent">
+        <section className="surface-panel hero-panel has-hero-banner curve-accent">
+          <HeroBannerBackdrop
+            src="/banners/showcase-banner.webp"
+            alt="CampusLoop campus marketplace showcase"
+          />
           <HeroAmbient />
           <PageIntro
             eyebrow="Privacy Policy"
@@ -135,7 +146,11 @@ export function TermsPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel curve-accent">
+        <section className="surface-panel hero-panel has-hero-banner curve-accent">
+          <HeroBannerBackdrop
+            src="/banners/showcase-banner.webp"
+            alt="CampusLoop campus marketplace showcase"
+          />
           <HeroAmbient />
           <PageIntro
             eyebrow="Terms of Use"
@@ -228,7 +243,11 @@ export function ManualPage() {
       <div className="legal-wrap">
         <PageBackButton fallbackTo="/profile" label="Back" />
 
-        <section className="surface-panel hero-panel curve-accent">
+        <section className="surface-panel hero-panel has-hero-banner curve-accent">
+          <HeroBannerBackdrop
+            src="/banners/showcase-banner.webp"
+            alt="CampusLoop campus marketplace showcase"
+          />
           <HeroAmbient />
           <PageIntro
             eyebrow="User Manual"
@@ -304,7 +323,8 @@ export function ManualPage() {
             </div>
             <ol className="manual-steps">
               <li>
-                <strong>iPhone / iPad (Safari):</strong> Tap Share, then tap{" "}
+                <strong>iPhone / iPad (Safari):</strong> Tap{" "}
+                <SafariPageMenuIcon className="inline-icon" />, tap Share, then tap{" "}
                 <strong>Add to Home Screen</strong>.
               </li>
               <li>

@@ -71,6 +71,7 @@ export interface ProfileRecord {
   preferred_contact_method: string;
   show_public_contact: boolean;
   profile_image: string | null;
+  banner_image?: string | null | undefined;
   bio: string;
   account_type: AccountType;
   primary_university_id: string | null;
@@ -125,6 +126,7 @@ export interface PublicSellerProfileRecord {
   full_name: string;
   username: string;
   profile_image: string | null;
+  banner_image?: string | null | undefined;
   bio: string;
   account_type: AccountType;
   primary_university_id: string | null;

@@ -111,4 +111,113 @@ export function configureVapid(): {
   return { ready: true, publicKey, privateKey, subject };
 }
 
+export interface WebPushSubscriptionRow {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+export function chunkArray<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+export async function dispatchWebPushBatch(
+  adminClient: SupabaseClient,
+  targetUserIds: string[],
+  payload: {
+    title: string;
+    message: string;
+    url?: string;
+    tag?: string;
+  },
+): Promise<{
+  vapidConfigured: boolean;
+  deliveredDevices: number;
+  failedDevices: number;
+  pruned: number;
+}> {
+  const subs: WebPushSubscriptionRow[] = [];
+  for (const part of chunkArray(targetUserIds, 100)) {
+    const { data: subRows, error: subsErr } = await adminClient
+      .from("push_subscriptions")
+      .select("id, endpoint, p256dh, auth")
+      .in("user_id", part);
+    if (subsErr) throw subsErr;
+    for (const row of subRows || []) {
+      subs.push({
+        id: String(row.id),
+        endpoint: String(row.endpoint),
+        p256dh: String(row.p256dh),
+        auth: String(row.auth),
+      });
+    }
+  }
+
+  const vapid = configureVapid();
+  if (!vapid.ready) {
+    return { vapidConfigured: false, deliveredDevices: 0, failedDevices: 0, pruned: 0 };
+  }
+
+  if (subs.length === 0) {
+    return { vapidConfigured: true, deliveredDevices: 0, failedDevices: 0, pruned: 0 };
+  }
+
+  const pushBody = JSON.stringify({
+    title: payload.title,
+    body: payload.message,
+    message: payload.message,
+    url: normalizeSafePageUrl(payload.url),
+    tag: payload.tag || `cl-${Date.now()}`,
+  });
+
+  let deliveredDevices = 0;
+  let failedDevices = 0;
+  const expiredIds: string[] = [];
+
+  for (const batch of chunkArray(subs, 50)) {
+    await Promise.all(
+      batch.map(async (sub) => {
+        try {
+          await sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: sub.p256dh,
+                auth: sub.auth,
+              },
+            },
+            pushBody,
+          );
+          deliveredDevices += 1;
+        } catch (pushErr: unknown) {
+          failedDevices += 1;
+          const statusCode =
+            pushErr && typeof pushErr === "object" && "statusCode" in pushErr
+              ? Number((pushErr as { statusCode?: number }).statusCode)
+              : 0;
+          if (statusCode === 404 || statusCode === 410) {
+            expiredIds.push(String(sub.id));
+          }
+        }
+      }),
+    );
+  }
+
+  if (expiredIds.length > 0) {
+    for (const part of chunkArray(expiredIds, 100)) {
+      await adminClient.from("push_subscriptions").delete().in("id", part);
+    }
+  }
+
+  return {
+    vapidConfigured: true,
+    deliveredDevices,
+    failedDevices,
+    pruned: expiredIds.length,
+  };
+}
+
 export { sendNotification };

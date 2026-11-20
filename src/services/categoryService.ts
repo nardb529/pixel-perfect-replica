@@ -7,6 +7,7 @@ const CACHE_KEY = "cl_active_categories_v1";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
 let memoryCache: { expiresAt: number; data: CategoryRecord[] } | null = null;
+let inflightActiveRequest: Promise<CategoryRecord[]> | null = null;
 
 function readCachedCategories(): CategoryRecord[] | null {
   if (memoryCache && memoryCache.expiresAt > Date.now()) {
@@ -44,6 +45,7 @@ function writeCachedCategories(data: CategoryRecord[]): void {
 
 export function invalidateCategoryCache(): void {
   memoryCache = null;
+  inflightActiveRequest = null;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(CACHE_KEY);
@@ -65,20 +67,35 @@ export const categoryService = {
       if (cached) {
         return type ? cached.filter((c) => c.category_type === type) : cached;
       }
+      if (inflightActiveRequest) {
+        const rows = await inflightActiveRequest;
+        return type ? rows.filter((c) => c.category_type === type) : rows;
+      }
     }
 
-    const { data, error } = await client
-      .from("categories")
-      .select(CATEGORY_COLUMNS)
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
-      .order("name", { ascending: true });
+    const requestPromise = (async () => {
+      const { data, error } = await client
+        .from("categories")
+        .select(CATEGORY_COLUMNS)
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true });
 
-    if (error) throw error;
-    const rows = (data || []) as CategoryRecord[];
-    if (rows.length > 0) {
-      writeCachedCategories(rows);
+      if (error) throw error;
+      const rows = (data || []) as CategoryRecord[];
+      if (rows.length > 0) {
+        writeCachedCategories(rows);
+      }
+      return rows;
+    })().finally(() => {
+      inflightActiveRequest = null;
+    });
+
+    if (!options?.forceRefresh) {
+      inflightActiveRequest = requestPromise;
     }
+
+    const rows = await requestPromise;
     return type ? rows.filter((c) => c.category_type === type) : rows;
   },
 

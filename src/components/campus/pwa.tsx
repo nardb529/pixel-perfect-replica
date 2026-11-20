@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BRAND } from "@/lib/campus/data";
+import { SafariPageMenuIcon } from "./shared";
 import { useCampus } from "./store";
 
 type DeviceTab = "ios" | "android" | "desktop";
@@ -130,7 +131,7 @@ export function OnboardingPrompts() {
 
     toast.info(
       deviceTab === "ios"
-        ? "Tap ••• in Safari, tap Share, then choose Add to Home Screen"
+        ? "Tap the 3-line Page Menu button in Safari, tap Share, then choose Add to Home Screen"
         : deviceTab === "desktop"
           ? isMacSafari
             ? "Use Safari File menu -> Add to Dock"
@@ -358,8 +359,7 @@ export function OnboardingPrompts() {
                       <div className="install-step">
                         <span className="step-num">1</span>
                         <p>
-                          Tap <MoreHorizontal size={15} className="inline-icon" />{" "}
-                          <strong>•••</strong> in your Safari toolbar
+                          Tap <SafariPageMenuIcon className="inline-icon" /> in your Safari toolbar
                         </p>
                       </div>
                       <div className="install-step">
@@ -636,9 +636,9 @@ export function InstallGate() {
               <p>
                 {isIOS ? (
                   <>
-                    Tap <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong>,
-                    tap <Share size={14} className="inline-icon" /> <strong>Share</strong>, then
-                    choose <PlusSquare size={14} className="inline-icon" />{" "}
+                    Tap <SafariPageMenuIcon className="inline-icon" /> in Safari, tap{" "}
+                    <Share size={14} className="inline-icon" /> <strong>Share</strong>, then choose{" "}
+                    <PlusSquare size={14} className="inline-icon" />{" "}
                     <strong>Add to Home Screen</strong>.
                   </>
                 ) : (
@@ -654,8 +654,7 @@ export function InstallGate() {
             <div className="install-step">
               <span className="step-num">1</span>
               <p>
-                Tap <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong> in
-                your Safari toolbar
+                Tap <SafariPageMenuIcon className="inline-icon" /> in your Safari toolbar
               </p>
             </div>
             <div className="install-step">

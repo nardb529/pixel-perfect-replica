@@ -150,6 +150,7 @@ alter table public.profiles add column if not exists subscription_status text no
 alter table public.profiles add column if not exists subscription_expires_at timestamptz;
 alter table public.profiles add column if not exists paystack_customer_code text;
 alter table public.profiles add column if not exists paystack_reference text;
+alter table public.profiles add column if not exists banner_image text;
 
 do $$ begin
   alter table public.profiles
@@ -198,7 +199,8 @@ select
     else null
   end as public_contact_handle,
   p.is_suspended,
-  p.created_at
+  p.created_at,
+  p.banner_image
 from public.profiles p
 where p.is_suspended = false;
 

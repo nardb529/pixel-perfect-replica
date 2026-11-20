@@ -7,6 +7,7 @@ const CACHE_KEY = "cl_active_universities_v1";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
 let memoryCache: { expiresAt: number; data: UniversityRecord[] } | null = null;
+let inflightActiveRequest: Promise<UniversityRecord[]> | null = null;
 
 function readCachedUniversities(): UniversityRecord[] | null {
   if (memoryCache && memoryCache.expiresAt > Date.now()) {
@@ -44,6 +45,7 @@ function writeCachedUniversities(data: UniversityRecord[]): void {
 
 export function invalidateUniversityCache(): void {
   memoryCache = null;
+  inflightActiveRequest = null;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(CACHE_KEY);
@@ -59,20 +61,30 @@ export const universityService = {
     if (!options?.forceRefresh) {
       const cached = readCachedUniversities();
       if (cached) return cached;
+      if (inflightActiveRequest) return inflightActiveRequest;
     }
 
-    const { data, error } = await client
-      .from("universities")
-      .select(UNIVERSITY_COLUMNS)
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
-      .order("university_name", { ascending: true });
-    if (error) throw error;
-    const rows = (data || []) as UniversityRecord[];
-    if (rows.length > 0) {
-      writeCachedUniversities(rows);
+    const requestPromise = (async () => {
+      const { data, error } = await client
+        .from("universities")
+        .select(UNIVERSITY_COLUMNS)
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+        .order("university_name", { ascending: true });
+      if (error) throw error;
+      const rows = (data || []) as UniversityRecord[];
+      if (rows.length > 0) {
+        writeCachedUniversities(rows);
+      }
+      return rows;
+    })().finally(() => {
+      inflightActiveRequest = null;
+    });
+
+    if (!options?.forceRefresh) {
+      inflightActiveRequest = requestPromise;
     }
-    return rows;
+    return requestPromise;
   },
 
   async listAllUniversities(): Promise<UniversityRecord[]> {

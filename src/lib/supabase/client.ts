@@ -124,10 +124,17 @@ export async function compressImageFile(
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
 
-    const targetType = file.type === "image/png" ? "image/webp" : "image/jpeg";
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, targetType, quality),
+    const webpBlob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", quality),
     );
+    let targetType = "image/webp";
+    let blob = webpBlob;
+    if (!blob || blob.size === 0) {
+      targetType = "image/jpeg";
+      blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", quality),
+      );
+    }
     if (!blob || blob.size >= file.size) return file;
     const ext = targetType === "image/webp" ? "webp" : "jpg";
     const cleanName = file.name.replace(/\.[^.]+$/, "") || "upload";

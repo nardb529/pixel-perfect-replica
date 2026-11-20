@@ -23,9 +23,10 @@ import type {
 
 const PROFILE_COLUMNS_BASE =
   "id, full_name, username, email, phone_number, whatsapp_number, preferred_contact_method, show_public_contact, profile_image, bio, account_type, primary_university_id, verification_status, is_student, id_document_type, id_document_path, verification_photo_confirmed, verification_submitted_at, verification_note, role, is_suspended, notification_preferences, created_at, updated_at";
-const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, verification_checks, subscription_tier, subscription_status, subscription_expires_at`;
-const PUBLIC_SELLER_COLUMNS =
+const PROFILE_COLUMNS = `${PROFILE_COLUMNS_BASE}, banner_image, verification_checks, subscription_tier, subscription_status, subscription_expires_at`;
+const PUBLIC_SELLER_COLUMNS_BASE =
   "id, full_name, username, profile_image, bio, account_type, primary_university_id, verification_status, preferred_contact_method, public_contact_handle, is_suspended, created_at";
+const PUBLIC_SELLER_COLUMNS = `${PUBLIC_SELLER_COLUMNS_BASE}, banner_image`;
 
 export interface UpdateProfileInput {
   full_name?: string | undefined;
@@ -35,6 +36,7 @@ export interface UpdateProfileInput {
   preferred_contact_method?: string | undefined;
   show_public_contact?: boolean | undefined;
   profile_image?: string | null | undefined;
+  banner_image?: string | null | undefined;
   bio?: string | undefined;
   account_type?: AccountType | undefined;
   primary_university_id?: string | null | undefined;
@@ -81,7 +83,18 @@ export const profileService = {
       .select(PUBLIC_SELLER_COLUMNS)
       .eq("id", sellerId)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      if (isSchemaMissingError(error)) {
+        const fallback = await client
+          .from("public_seller_profiles")
+          .select(PUBLIC_SELLER_COLUMNS_BASE)
+          .eq("id", sellerId)
+          .maybeSingle();
+        if (fallback.error) throw fallback.error;
+        return fallback.data as PublicSellerProfileRecord | null;
+      }
+      throw error;
+    }
     return data as PublicSellerProfileRecord | null;
   },
 
@@ -107,6 +120,7 @@ export const profileService = {
     if (input.show_public_contact !== undefined)
       sanitized["show_public_contact"] = input.show_public_contact;
     if (input.profile_image !== undefined) sanitized["profile_image"] = input.profile_image;
+    if (input.banner_image !== undefined) sanitized["banner_image"] = input.banner_image;
     if (input.bio !== undefined) sanitized["bio"] = input.bio.trim().slice(0, 600);
     if (input.account_type !== undefined) sanitized["account_type"] = input.account_type;
     if (input.primary_university_id !== undefined)
@@ -121,9 +135,11 @@ export const profileService = {
 
     if (error) {
       if (isSchemaMissingError(error)) {
+        const baseSanitized = { ...sanitized };
+        delete baseSanitized["banner_image"];
         const fallback = await supabase
           .from("profiles")
-          .update(sanitized)
+          .update(baseSanitized)
           .eq("id", user.id)
           .select(PROFILE_COLUMNS_BASE)
           .single();
@@ -202,6 +218,38 @@ export const profileService = {
     };
     const ext = mimeToExt[optimized.type] || "jpg";
     const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("profile-images")
+      .upload(path, optimized, {
+        upsert: true,
+        contentType: optimized.type,
+        cacheControl: "2592000",
+      });
+
+    if (uploadErr) throw uploadErr;
+
+    const { data } = supabase.storage.from("profile-images").getPublicUrl(path);
+    return data.publicUrl;
+  },
+
+  async uploadShopBanner(file: File): Promise<string> {
+    const supabase = requireSupabase();
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      throw new UserInputError("Choose a JPG, PNG, or WebP image for your shop banner.");
+    }
+    const user = await getSessionUser(supabase);
+    if (!user) throw new Error("Authentication required");
+
+    const optimized = await prepareImageForUpload(file, 1440, 0.82);
+    const mimeToExt: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/avif": "avif",
+    };
+    const ext = mimeToExt[optimized.type] || "webp";
+    const path = `${user.id}/banner-${Date.now()}.${ext}`;
 
     const { error: uploadErr } = await supabase.storage
       .from("profile-images")
@@ -325,20 +373,25 @@ export const profileService = {
       .select(PROFILE_COLUMNS)
       .single();
 
-    if (error) {
-      if (isSchemaMissingError(error)) {
-        const fallback = await supabase
-          .from("profiles")
-          .update(basePayload)
-          .eq("id", user.id)
-          .select(PROFILE_COLUMNS_BASE)
-          .single();
-        if (fallback.error) throw fallback.error;
-        return fallback.data as ProfileRecord;
+    const fallbackProfile = await (async (): Promise<ProfileRecord> => {
+      if (error) {
+        if (isSchemaMissingError(error)) {
+          const fallback = await supabase
+            .from("profiles")
+            .update(basePayload)
+            .eq("id", user.id)
+            .select(PROFILE_COLUMNS_BASE)
+            .single();
+          if (fallback.error) throw fallback.error;
+          return fallback.data as ProfileRecord;
+        }
+        throw error;
       }
-      throw error;
-    }
-    return data as ProfileRecord;
+      return data as ProfileRecord;
+    })();
+
+    void this.notifyAdminsOfVerificationSubmission();
+    return fallbackProfile;
   },
   /**
    * Live-selfie verification. Stores ONE small private photo in the
@@ -380,6 +433,28 @@ export const profileService = {
       .select(PROFILE_COLUMNS)
       .single();
     if (error) throw error;
+
+    void this.notifyAdminsOfVerificationSubmission();
     return data as ProfileRecord;
+  },
+
+  async notifyAdminsOfVerificationSubmission(): Promise<void> {
+    if (typeof window === "undefined") return;
+    const client = getSupabaseClient();
+    if (!client) return;
+    try {
+      const { data: sessionData } = await client.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) return;
+      await fetch("/api/push/notify-admin-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch {
+      // Non-blocking best effort so verification submission succeeds even if push is unconfigured
+    }
   },
 };

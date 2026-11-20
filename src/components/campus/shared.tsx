@@ -74,6 +74,65 @@ export function BrandMark({ size = 34, animated = false }: { size?: number; anim
   );
 }
 
+export function SafariPageMenuIcon({ className = "" }: { className?: string }) {
+  return (
+    <span className={`safari-menu-badge ${className}`.trim()} aria-label="Safari Page Menu icon">
+      <svg width="16" height="12" viewBox="0 0 18 14" fill="none" aria-hidden="true">
+        <line
+          x1="2"
+          y1="2.5"
+          x2="16"
+          y2="2.5"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="2"
+          y1="7"
+          x2="16"
+          y2="7"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="2"
+          y1="11.5"
+          x2="11"
+          y2="11.5"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+export function HeroBannerBackdrop({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !isSafeMediaUrl(src)) {
+    return null;
+  }
+
+  return (
+    <div className="hero-banner-media" aria-hidden="true">
+      <img
+        src={src}
+        alt={alt}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+      />
+      <span className="hero-banner-scrim" />
+    </div>
+  );
+}
+
 export function HeroAmbient() {
   return (
     <div className="hero-ambient" aria-hidden="true">
@@ -723,7 +782,15 @@ export function PageBackButton({
   );
 }
 
-export function ListingCard({ listing, compact = false }: { listing: Listing; compact?: boolean }) {
+export function ListingCard({
+  listing,
+  compact = false,
+  priority = false,
+}: {
+  listing: Listing;
+  compact?: boolean;
+  priority?: boolean;
+}) {
   const { saved, toggleSave, recordContact } = useCampus();
   const [imgFailed, setImgFailed] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -750,7 +817,8 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
               <img
                 src={safeImage}
                 alt={listing.title}
-                loading="lazy"
+                loading={priority ? "eager" : "lazy"}
+                fetchPriority={priority ? "high" : undefined}
                 decoding="async"
                 referrerPolicy="no-referrer"
                 width={1024}

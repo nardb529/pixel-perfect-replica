@@ -320,21 +320,47 @@ describe("Security hardening, strict per-user isolation & free-tier SQL optimiza
     expect(stylesCss).toContain("@media (max-height: 540px) and (max-width: 960px)");
   });
 
-  it("includes push_subscriptions migration, strict per-user RLS, and sw.js campusloop-v7", () => {
+  it("includes push_subscriptions migration, strict per-user RLS, and sw.js campusloop-v9", () => {
     const pushMigration = readFileSync(
       join(process.cwd(), "supabase/migrations/202611190001_push_subscriptions.sql"),
       "utf8",
     );
     const swCode = readFileSync(join(process.cwd(), "public/sw.js"), "utf8");
+    const adminVerifyPushRoute = readFileSync(
+      join(process.cwd(), "src/routes/api/push/notify-admin-verification.ts"),
+      "utf8",
+    );
+    const profileServiceCode = readFileSync(
+      join(process.cwd(), "src/services/profileService.ts"),
+      "utf8",
+    );
+    const adminServiceCode = readFileSync(
+      join(process.cwd(), "src/services/adminService.ts"),
+      "utf8",
+    );
+
     expect(pushMigration).toContain("references auth.users(id) on delete cascade");
     expect(pushMigration).toContain("endpoint text not null unique");
     expect(pushMigration).toContain("on public.push_subscriptions for select");
     expect(pushMigration).toContain("on public.push_subscriptions for insert");
     expect(pushMigration).toContain("on public.push_subscriptions for delete");
     expect(setupSql).toContain("Migration: 202611190001_push_subscriptions.sql");
-    expect(swCode).toContain('const CACHE_NAME = "campusloop-v7"');
+    expect(swCode).toContain('const CACHE_NAME = "campusloop-v9"');
+    expect(swCode).toContain("/banners/discover-banner.webp");
+    expect(swCode).toContain("/banners/showcase-banner.webp");
+    expect(swCode).toContain("/banners/shop-default-banner.webp");
     expect(swCode).toContain('addEventListener("push"');
     expect(swCode).toContain('addEventListener("notificationclick"');
+    expect(adminVerifyPushRoute).toContain("/api/push/notify-admin-verification");
+    expect(adminVerifyPushRoute).toContain('.eq("role", "admin")');
+    expect(adminVerifyPushRoute).toContain("dispatchWebPushBatch");
+    expect(profileServiceCode).toContain("notifyAdminsOfVerificationSubmission");
+    expect(adminServiceCode).toContain("/api/push/send");
+    expect(adminServiceCode).toContain("Seller account approved!");
+    expect(adminServiceCode).toContain("Seller verification not approved yet");
+    expect(stylesCss).toContain("rgba(10, 14, 28, 0.66)");
+    expect(stylesCss).toContain("rgba(10, 14, 28, 0.36)");
+    expect(stylesCss).toContain("rgba(10, 14, 28, 0.28)");
   });
 
   it("enforces seller verification security layer with private ID storage and verified-seller listing RLS", () => {

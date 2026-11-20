@@ -1,10 +1,13 @@
-const CACHE_NAME = "campusloop-v7";
+const CACHE_NAME = "campusloop-v9";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.svg",
   "/pwa-192x192.png",
   "/pwa-512x512.png",
   "/apple-touch-icon.png",
+  "/banners/discover-banner.webp",
+  "/banners/showcase-banner.webp",
+  "/banners/shop-default-banner.webp",
 ];
 const PRIVATE_ROUTE_PREFIXES = [
   "/admin",

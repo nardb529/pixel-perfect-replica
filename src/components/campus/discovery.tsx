@@ -20,6 +20,7 @@ import { useCampus } from "./store";
 import {
   Shell,
   HeroAmbient,
+  HeroBannerBackdrop,
   SearchBar,
   SectionTitle,
   ListingCard,
@@ -172,7 +173,11 @@ export function DiscoverPage() {
 
   return (
     <Shell>
-      <section className="surface-panel hero-panel curve-accent">
+      <section className="surface-panel hero-panel has-hero-banner curve-accent">
+        <HeroBannerBackdrop
+          src="/banners/discover-banner.webp"
+          alt="Students shopping campus laptops, books, and essentials on CampusLoop"
+        />
         <HeroAmbient />
 
         <div className="discover-heading">
@@ -258,8 +263,8 @@ export function DiscoverPage() {
           </Empty>
         ) : results.length ? (
           <div className={searching ? "listing-grid" : "listing-carousel"}>
-            {(searching ? results : results.slice(0, 4)).map((l) => (
-              <ListingCard key={l.id} listing={l} />
+            {(searching ? results : results.slice(0, 4)).map((l, idx) => (
+              <ListingCard key={l.id} listing={l} priority={idx < 4} />
             ))}
           </div>
         ) : (
@@ -530,7 +535,11 @@ export function BrowsePage({
   return (
     <Shell>
       <PageBackButton fallbackTo="/discover" label="Back" />
-      <section className="surface-panel hero-panel browse-panel curve-accent">
+      <section className="surface-panel hero-panel browse-panel has-hero-banner curve-accent">
+        <HeroBannerBackdrop
+          src="/banners/showcase-banner.webp"
+          alt="Curated student products and campus services on CampusLoop"
+        />
         <HeroAmbient />
 
         <PageIntro
@@ -558,6 +567,7 @@ export function BrowsePage({
             <Button
               key={c}
               className="filter-chip"
+              data-active={c === category}
               variant={c === category ? "default" : "outline"}
               onClick={() => setCategory(c)}
             >
@@ -625,8 +635,8 @@ export function BrowsePage({
         {visibleResults.length ? (
           <>
             <div className="listing-grid">
-              {visibleResults.map((l) => (
-                <ListingCard key={l.id} listing={l} />
+              {visibleResults.map((l, idx) => (
+                <ListingCard key={l.id} listing={l} priority={idx < 4} />
               ))}
             </div>
             {hasMore && (

@@ -70,6 +70,7 @@ export type CampusUser = {
   phoneNumber?: string | null | undefined;
   whatsappNumber?: string | null | undefined;
   avatar?: string | undefined;
+  bannerImage?: string | undefined;
   role?: UserRole | undefined;
   verificationStatus?: VerificationStatus | undefined;
   isStudent?: boolean | undefined;
@@ -96,6 +97,40 @@ interface BeforeInstallPromptEvent extends Event {
 
 const NOTIF_PROMPTED_KEY = "cl_notif_prompted_v1";
 const THEME_STORAGE_KEY = "cl_theme_v1";
+const LISTINGS_SWR_KEY = "cl_listings_swr_v1";
+const LISTINGS_SWR_TTL_MS = 5 * 60 * 1000;
+
+function readCachedAllListings(): Listing[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(LISTINGS_SWR_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { expiresAt?: number; items?: Listing[] };
+    if (
+      typeof parsed?.expiresAt === "number" &&
+      parsed.expiresAt > Date.now() &&
+      Array.isArray(parsed.items) &&
+      parsed.items.length > 0
+    ) {
+      return parsed.items;
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+  return null;
+}
+
+function writeCachedAllListings(items: Listing[]): void {
+  if (typeof window === "undefined" || items.length === 0) return;
+  try {
+    window.sessionStorage.setItem(
+      LISTINGS_SWR_KEY,
+      JSON.stringify({ expiresAt: Date.now() + LISTINGS_SWR_TTL_MS, items }),
+    );
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
 function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): CampusUser {
   const matchedUni = uniList.find((u) => u.id === profile.primary_university_id);
@@ -114,6 +149,7 @@ function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): 
     phoneNumber: profile.phone_number,
     whatsappNumber: profile.whatsapp_number,
     avatar: profile.profile_image || undefined,
+    bannerImage: profile.banner_image || undefined,
     role: profile.role,
     verificationStatus: profile.verification_status,
     isStudent: profile.is_student,
@@ -284,7 +320,13 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       setListings([]);
       return;
     }
-    setListingsLoading(true);
+    const cached = university === "All Universities" ? readCachedAllListings() : null;
+    if (cached && listingsRef.current.length === 0) {
+      setListings(cached);
+      setListingsLoading(false);
+    } else {
+      setListingsLoading(true);
+    }
     setListingsError(null);
     try {
       const { items } = await listingService.searchListings({
@@ -294,12 +336,17 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       });
       setSchemaReady(true);
       setListings(items);
+      if (university === "All Universities") {
+        writeCachedAllListings(items);
+      }
     } catch (err) {
       if (isSchemaMissingError(err)) {
         setSchemaReady(false);
       }
-      setListingsError(toUserSafeErrorMessage(err));
-      setListings([]);
+      if (!cached) {
+        setListingsError(toUserSafeErrorMessage(err));
+        setListings([]);
+      }
     } finally {
       setListingsLoading(false);
     }

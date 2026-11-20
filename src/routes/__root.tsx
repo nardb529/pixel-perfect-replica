@@ -18,6 +18,18 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { buildStructuredDataGraph, DEFAULT_SITE_URL } from "@/lib/campus/meta";
 
+const supabaseOrigin = (() => {
+  try {
+    const raw =
+      typeof import.meta !== "undefined" && import.meta.env
+        ? (import.meta.env["VITE_SUPABASE_URL"] as string | undefined)
+        : undefined;
+    return raw ? new URL(raw).origin : "";
+  } catch {
+    return "";
+  }
+})();
+
 function NotFoundComponent() {
   return (
     <div className="error-boundary-shell">
@@ -139,6 +151,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      ...(supabaseOrigin
+        ? [
+            { rel: "dns-prefetch", href: supabaseOrigin },
+            { rel: "preconnect", href: supabaseOrigin, crossOrigin: "anonymous" as const },
+          ]
+        : []),
+      {
+        rel: "preload",
+        as: "image",
+        type: "image/webp",
+        href: "/banners/discover-banner.webp",
+      },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
