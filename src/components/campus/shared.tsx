@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -27,8 +29,7 @@ import {
   Sun,
   Moon,
   Check,
-  Bell,
-  BellRing,
+  BadgeCheck,
   Globe,
   GraduationCap,
   MessageCircle,
@@ -41,6 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCampus } from "./store";
+import { hasSeenImage, markImageSeen } from "@/lib/campus/imageCache";
 import {
   BRAND,
   buildPhoneHref,
@@ -71,65 +73,6 @@ export function BrandMark({ size = 34, animated = false }: { size?: number; anim
       />
       <circle className="brand-loop-node" cx="41.5" cy="32" r="2.8" fill="#FFFFFF" />
     </svg>
-  );
-}
-
-export function SafariPageMenuIcon({ className = "" }: { className?: string }) {
-  return (
-    <span className={`safari-menu-badge ${className}`.trim()} aria-label="Safari Page Menu icon">
-      <svg width="16" height="12" viewBox="0 0 18 14" fill="none" aria-hidden="true">
-        <line
-          x1="2"
-          y1="2.5"
-          x2="16"
-          y2="2.5"
-          stroke="currentColor"
-          strokeWidth="2.3"
-          strokeLinecap="round"
-        />
-        <line
-          x1="2"
-          y1="7"
-          x2="16"
-          y2="7"
-          stroke="currentColor"
-          strokeWidth="2.3"
-          strokeLinecap="round"
-        />
-        <line
-          x1="2"
-          y1="11.5"
-          x2="11"
-          y2="11.5"
-          stroke="currentColor"
-          strokeWidth="2.3"
-          strokeLinecap="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
-export function HeroBannerBackdrop({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false);
-
-  if (failed || !isSafeMediaUrl(src)) {
-    return null;
-  }
-
-  return (
-    <div className="hero-banner-media" aria-hidden="true">
-      <img
-        src={src}
-        alt={alt}
-        loading="eager"
-        decoding="async"
-        fetchPriority="high"
-        referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-      />
-      <span className="hero-banner-scrim" />
-    </div>
   );
 }
 
@@ -450,44 +393,25 @@ export function UniversitySelect({ compact = false }: { compact?: boolean }) {
   );
 }
 
+const ShellNestedContext = createContext(false);
+
 export function Shell({ children }: { children: ReactNode }) {
-  const {
-    user,
-    saved,
-    pushState,
-    pushChecked,
-    unreadNotificationCount,
-    openNotifPrompt,
-    requestAppNotifications,
-    openInstallPrompt,
-    isStandalone,
-  } = useCampus();
+  const alreadyInsideShell = useContext(ShellNestedContext);
+  // A page (or loading placeholder) rendered inside another Shell must not draw a second
+  // header/footer. This is what caused the doubled title bar while pages were loading.
+  if (alreadyInsideShell) return <>{children}</>;
+  return (
+    <ShellNestedContext.Provider value={true}>
+      <ShellFrame>{children}</ShellFrame>
+    </ShellNestedContext.Provider>
+  );
+}
+
+function ShellFrame({ children }: { children: ReactNode }) {
+  const { user, saved } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
-
-  function handleHeaderNotifClick() {
-    if (pushState === "on") {
-      if (user) {
-        void navigate({ to: "/dashboard" });
-      } else {
-        toast.success("Notifications are active on this device");
-      }
-      return;
-    }
-    openNotifPrompt();
-  }
-
-  async function handleQuickEnablePush() {
-    const result = await requestAppNotifications();
-    if (result === "granted") {
-      toast.success("Notifications turned on for this device");
-    } else if (result === "denied") {
-      openNotifPrompt();
-    } else if (result === "unsupported") {
-      openNotifPrompt();
-    }
-  }
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof router.preloadRoute !== "function") return;
@@ -571,29 +495,6 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="header-actions">
               <UniversitySelect />
               <ThemeToggle compact />
-              <button
-                type="button"
-                onClick={handleHeaderNotifClick}
-                className={`header-icon-btn header-notif-btn ${
-                  pushChecked && pushState !== "on" ? "needs-attention" : ""
-                }`}
-                title={
-                  pushState === "on"
-                    ? unreadNotificationCount > 0
-                      ? `Notifications · ${unreadNotificationCount} unread`
-                      : "Notifications are on"
-                    : "Turn on your notifications"
-                }
-                aria-label={pushState === "on" ? "Notifications" : "Turn on your notifications"}
-              >
-                {pushChecked && pushState !== "on" ? <BellRing size={17} /> : <Bell size={17} />}
-                {pushState === "on" && unreadNotificationCount > 0 && (
-                  <span className="save-count">{unreadNotificationCount}</span>
-                )}
-                {pushChecked && pushState !== "on" && (
-                  <span className="header-notif-dot" aria-hidden="true" />
-                )}
-              </button>
               {user?.role === "admin" && (
                 <Link
                   to="/admin"
@@ -625,51 +526,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="market-main">
-        {pushChecked && pushState !== "on" && (
-          <div className="notif-persistent-bar" role="region" aria-label="Turn on notifications">
-            <span className="notif-persistent-icon" aria-hidden="true">
-              <BellRing size={16} />
-            </span>
-            <div className="notif-persistent-copy">
-              <strong>
-                {pushState === "blocked"
-                  ? "Notifications are blocked in device settings"
-                  : pushState === "unsupported" && !isStandalone
-                    ? "Add CampusLoop to Home Screen for alerts"
-                    : "Turn on your notifications"}
-              </strong>
-              <span>
-                {pushState === "blocked"
-                  ? "Allow CampusLoop notifications in site settings so updates reach your phone."
-                  : pushState === "unsupported" && !isStandalone
-                    ? "Open from your Home Screen icon to turn on phone notifications."
-                    : "Get CampusLoop messages and updates on your device even when closed."}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="notif-persistent-btn"
-              onClick={() => {
-                if (pushState === "off") {
-                  void handleQuickEnablePush();
-                } else if (pushState === "unsupported" && !isStandalone) {
-                  openInstallPrompt();
-                } else {
-                  openNotifPrompt();
-                }
-              }}
-            >
-              {pushState === "blocked"
-                ? "Fix"
-                : pushState === "unsupported" && !isStandalone
-                  ? "Install app"
-                  : "Turn on"}
-            </button>
-          </div>
-        )}
-        {children}
-      </main>
+      <main className="market-main">{children}</main>
 
       <footer className="market-footer-wrap">
         <div className="market-footer surface-panel">
@@ -782,26 +639,20 @@ export function PageBackButton({
   );
 }
 
-export function ListingCard({
-  listing,
-  compact = false,
-  priority = false,
-}: {
-  listing: Listing;
-  compact?: boolean;
-  priority?: boolean;
-}) {
+export function ListingCard({ listing, compact = false }: { listing: Listing; compact?: boolean }) {
   const { saved, toggleSave, recordContact } = useCampus();
   const [imgFailed, setImgFailed] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const isSaved = saved.includes(listing.id);
   const hasPrice = listing.type === "product" || listing.price > 0;
   const isService = listing.type === "service";
+  const metaTag = isService ? "Service" : listing.condition === "New" ? "New" : listing.condition;
   const enquiryText = `Hi ${listing.seller}, I saw “${listing.title}” on CampusLoop. Is it still available?`;
   const whatsappUrl = buildWhatsAppUrl(listing.contact, enquiryText);
   const phoneHref = buildPhoneHref(listing.contact);
 
   const safeImage = isSafeMediaUrl(listing.image) ? listing.image : "";
+  const wasSeen = hasSeenImage(safeImage);
 
   function handleQuickAction() {
     recordContact(listing.id, listing.contactMethod || "WhatsApp");
@@ -810,24 +661,24 @@ export function ListingCard({
 
   return (
     <>
-      <article className={`listing-card ${compact ? "compact" : ""}`}>
+      <article className={`listing-card ${compact ? "compact" : ""} ${wasSeen ? "is-seen" : ""}`}>
         <div className="listing-image">
           <Link to="/listing/$id" params={{ id: listing.id }} aria-label={`View ${listing.title}`}>
             {!imgFailed && safeImage ? (
               <img
                 src={safeImage}
                 alt={listing.title}
-                loading={priority ? "eager" : "lazy"}
-                fetchPriority={priority ? "high" : undefined}
+                loading={wasSeen ? "eager" : "lazy"}
                 decoding="async"
                 referrerPolicy="no-referrer"
                 width={1024}
                 height={1024}
+                onLoad={() => markImageSeen(safeImage)}
                 onError={() => setImgFailed(true)}
               />
             ) : (
               <div className="listing-image-fallback">
-                {isService ? <Briefcase size={26} /> : <ShoppingBag size={26} />}
+                {isService ? <Briefcase size={24} /> : <ShoppingBag size={24} />}
                 <span>{listing.category}</span>
               </div>
             )}
@@ -843,9 +694,14 @@ export function ListingCard({
           </button>
         </div>
         <div className="listing-info">
+          <div className="listing-meta-top">
+            <span className="listing-category">{listing.category}</span>
+            {metaTag && <span className="listing-kind">· {metaTag}</span>}
+          </div>
           <Link to="/listing/$id" params={{ id: listing.id }}>
             <h3>{listing.title}</h3>
           </Link>
+          {isService && <p className="listing-desc">{listing.description}</p>}
           <p className={`listing-price ${!hasPrice ? "on-request" : ""}`}>
             {isService && hasPrice && listing.priceType !== "Free" && <small>From </small>}
             {formatListingPrice(listing)}
@@ -861,6 +717,20 @@ export function ListingCard({
                   : listing.university}
             </span>
           </p>
+          <div className="listing-byline">
+            <Link
+              to="/seller/$id"
+              params={{ id: listing.sellerId || listing.id }}
+              className="listing-seller-link inline-flex items-center gap-1"
+              aria-label={`Visit ${listing.seller}'s shop`}
+            >
+              <span>{listing.seller}</span>
+              {listing.verificationStatus === "verified" && (
+                <BadgeCheck size={12} aria-label="Verified seller" className="text-primary" />
+              )}
+            </Link>
+            <span>{listing.time}</span>
+          </div>
           <button
             type="button"
             className={`listing-cta-btn ${isService ? "is-service" : "is-product"}`}
