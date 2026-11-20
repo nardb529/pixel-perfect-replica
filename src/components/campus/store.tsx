@@ -1,3 +1,4 @@
+import { warmImages } from "@/lib/campus/imageCache";
 import {
   createContext,
   useCallback,
@@ -21,12 +22,10 @@ import {
   resetVisitorSessionId,
 } from "@/lib/supabase/client";
 import { clearAnalyticsSessionCache } from "@/services/analyticsService";
-import type { LiveSelfieChecks, VerificationChecksPayload } from "@/lib/campus/idVerification";
+import type { VerificationChecksPayload } from "@/lib/campus/idVerification";
 import {
   getPushNotificationState,
-  getStoredPushOptIn,
   removePushSubscriptionForCurrentUser,
-  setStoredPushOptIn,
   showDeviceNotification,
   syncPushSubscriptionForCurrentUser,
   type PushNotificationState,
@@ -70,7 +69,6 @@ export type CampusUser = {
   phoneNumber?: string | null | undefined;
   whatsappNumber?: string | null | undefined;
   avatar?: string | undefined;
-  bannerImage?: string | undefined;
   role?: UserRole | undefined;
   verificationStatus?: VerificationStatus | undefined;
   isStudent?: boolean | undefined;
@@ -79,7 +77,7 @@ export type CampusUser = {
   verificationPhotoConfirmed?: boolean | undefined;
   verificationSubmittedAt?: string | null | undefined;
   verificationNote?: string | null | undefined;
-  verificationChecks?: VerificationChecksPayload | LiveSelfieChecks | null | undefined;
+  verificationChecks?: VerificationChecksPayload | null | undefined;
   isSuspended?: boolean | undefined;
   subscriptionTier?: SubscriptionTier | undefined;
   subscriptionStatus?: SubscriptionStatus | undefined;
@@ -97,40 +95,6 @@ interface BeforeInstallPromptEvent extends Event {
 
 const NOTIF_PROMPTED_KEY = "cl_notif_prompted_v1";
 const THEME_STORAGE_KEY = "cl_theme_v1";
-const LISTINGS_SWR_KEY = "cl_listings_swr_v1";
-const LISTINGS_SWR_TTL_MS = 5 * 60 * 1000;
-
-function readCachedAllListings(): Listing[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(LISTINGS_SWR_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { expiresAt?: number; items?: Listing[] };
-    if (
-      typeof parsed?.expiresAt === "number" &&
-      parsed.expiresAt > Date.now() &&
-      Array.isArray(parsed.items) &&
-      parsed.items.length > 0
-    ) {
-      return parsed.items;
-    }
-  } catch {
-    // Ignore storage read errors
-  }
-  return null;
-}
-
-function writeCachedAllListings(items: Listing[]): void {
-  if (typeof window === "undefined" || items.length === 0) return;
-  try {
-    window.sessionStorage.setItem(
-      LISTINGS_SWR_KEY,
-      JSON.stringify({ expiresAt: Date.now() + LISTINGS_SWR_TTL_MS, items }),
-    );
-  } catch {
-    // Ignore storage quota errors
-  }
-}
 
 function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): CampusUser {
   const matchedUni = uniList.find((u) => u.id === profile.primary_university_id);
@@ -149,7 +113,6 @@ function mapProfileToUser(profile: ProfileRecord, uniList: UniversityRecord[]): 
     phoneNumber: profile.phone_number,
     whatsappNumber: profile.whatsapp_number,
     avatar: profile.profile_image || undefined,
-    bannerImage: profile.banner_image || undefined,
     role: profile.role,
     verificationStatus: profile.verification_status,
     isStudent: profile.is_student,
@@ -222,12 +185,8 @@ type Store = {
   manualInstallOpen: boolean;
   openInstallPrompt: () => void;
   closeInstallPrompt: () => void;
-  notifPromptOpen: boolean;
-  openNotifPrompt: () => void;
-  closeNotifPrompt: () => void;
   notificationsEnabled: boolean;
   pushState: PushNotificationState;
-  pushChecked: boolean;
   refreshPushState: () => Promise<PushNotificationState>;
   requestAppNotifications: () => Promise<"granted" | "denied" | "default" | "unsupported">;
   disableAppNotifications: () => Promise<PushNotificationState>;
@@ -250,7 +209,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(isSupabaseConfigured);
   const [myUniversity, setMyUniversity] = useState("KNUST");
-  const [university, setUniversity] = useState("All Universities");
+  const [university, setUniversity] = useState("KNUST");
   const [dbUniversities, setDbUniversities] = useState<UniversityRecord[]>([]);
   const [dbCategories, setDbCategories] = useState<CategoryRecord[]>([]);
   const [user, setUserState] = useState<CampusUser | null>(null);
@@ -271,10 +230,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
   const [buyerInstallOpen, setBuyerInstallOpen] = useState(false);
   const [sellerPostAuthStage, setSellerPostAuthStage] = useState<SellerPostAuthStage>("none");
   const [manualInstallOpen, setManualInstallOpen] = useState(false);
-  const [notifPromptOpen, setNotifPromptOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [pushState, setPushState] = useState<PushNotificationState>("off");
-  const [pushChecked, setPushChecked] = useState(false);
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const dbUniversitiesRef = useRef<UniversityRecord[]>([]);
   dbUniversitiesRef.current = dbUniversities;
@@ -320,13 +277,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       setListings([]);
       return;
     }
-    const cached = university === "All Universities" ? readCachedAllListings() : null;
-    if (cached && listingsRef.current.length === 0) {
-      setListings(cached);
-      setListingsLoading(false);
-    } else {
-      setListingsLoading(true);
-    }
+    setListingsLoading(true);
     setListingsError(null);
     try {
       const { items } = await listingService.searchListings({
@@ -336,17 +287,13 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       });
       setSchemaReady(true);
       setListings(items);
-      if (university === "All Universities") {
-        writeCachedAllListings(items);
-      }
+      warmImages(items.map((l) => l.image));
     } catch (err) {
       if (isSchemaMissingError(err)) {
         setSchemaReady(false);
       }
-      if (!cached) {
-        setListingsError(toUserSafeErrorMessage(err));
-        setListings([]);
-      }
+      setListingsError(toUserSafeErrorMessage(err));
+      setListings([]);
     } finally {
       setListingsLoading(false);
     }
@@ -487,13 +434,7 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     );
 
     if ("Notification" in window) {
-      const preGranted = Notification.permission === "granted" && getStoredPushOptIn() !== "0";
-      setNotificationsEnabled(preGranted);
-      if (preGranted) {
-        setPushState("on");
-      } else if (Notification.permission === "denied") {
-        setPushState("blocked");
-      }
+      setNotificationsEnabled(Notification.permission === "granted");
     }
 
     if ("serviceWorker" in navigator) {
@@ -611,44 +552,26 @@ export function CampusProvider({ children }: { children: ReactNode }) {
     const next = await getPushNotificationState();
     setPushState(next);
     setNotificationsEnabled(next === "on");
-    setPushChecked(true);
     return next;
   }, []);
 
   useEffect(() => {
     void refreshPushState();
-    const onFocusOrVisible = () => {
-      if (document.visibilityState === "hidden") return;
-      void refreshPushState().then((next) => {
-        if (next === "on" && user?.id) {
-          void syncPushSubscriptionForCurrentUser();
-        }
-      });
-    };
-    window.addEventListener("focus", onFocusOrVisible);
-    document.addEventListener("visibilitychange", onFocusOrVisible);
-    return () => {
-      window.removeEventListener("focus", onFocusOrVisible);
-      document.removeEventListener("visibilitychange", onFocusOrVisible);
-    };
   }, [refreshPushState, user?.id]);
 
   const requestAppNotifications = useCallback(async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       setPushState("unsupported");
-      setPushChecked(true);
       return "unsupported" as const;
     }
     try {
-      const permission =
-        Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      const permission = await Notification.requestPermission();
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
       if (permission === "granted") {
-        setStoredPushOptIn(true);
-        setPushState("on");
-        setNotificationsEnabled(true);
-        setNotifPromptOpen(false);
-        void syncPushSubscriptionForCurrentUser();
+        const result = await syncPushSubscriptionForCurrentUser();
+        const nextState = result.subscribed ? "on" : await getPushNotificationState();
+        setPushState(nextState);
+        setNotificationsEnabled(nextState === "on");
       } else if (permission === "denied") {
         setPushState("blocked");
         setNotificationsEnabled(false);
@@ -656,33 +579,29 @@ export function CampusProvider({ children }: { children: ReactNode }) {
         setPushState("off");
         setNotificationsEnabled(false);
       }
-      setPushChecked(true);
       return permission;
     } catch {
       localStorage.setItem(NOTIF_PROMPTED_KEY, "1");
       setPushState("blocked");
       setNotificationsEnabled(false);
-      setPushChecked(true);
       return "denied" as const;
     }
   }, []);
 
   const disableAppNotifications = useCallback(async (): Promise<PushNotificationState> => {
-    setStoredPushOptIn(false);
     await removePushSubscriptionForCurrentUser();
     const next = await getPushNotificationState();
     setPushState(next);
     setNotificationsEnabled(next === "on");
-    setPushChecked(true);
     return next;
   }, []);
 
   const triggerSellerPostAuth = useCallback(() => {
     const hasNotificationApi = typeof window !== "undefined" && "Notification" in window;
-    const isNotOn =
-      hasNotificationApi && (Notification.permission !== "granted" || getStoredPushOptIn() === "0");
+    const isNotGranted = hasNotificationApi && Notification.permission !== "granted";
+    const isFirstTimePrompt = localStorage.getItem(NOTIF_PROMPTED_KEY) !== "1";
 
-    if (isNotOn) {
+    if (isNotGranted && isFirstTimePrompt) {
       setSellerPostAuthStage("notifications");
       return;
     }
@@ -713,14 +632,6 @@ export function CampusProvider({ children }: { children: ReactNode }) {
 
   const closeInstallPrompt = useCallback(() => {
     setManualInstallOpen(false);
-  }, []);
-
-  const openNotifPrompt = useCallback(() => {
-    setNotifPromptOpen(true);
-  }, []);
-
-  const closeNotifPrompt = useCallback(() => {
-    setNotifPromptOpen(false);
   }, []);
 
   const listingsRef = useRef(listings);
@@ -893,12 +804,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       manualInstallOpen,
       openInstallPrompt,
       closeInstallPrompt,
-      notifPromptOpen,
-      openNotifPrompt,
-      closeNotifPrompt,
       notificationsEnabled,
       pushState,
-      pushChecked,
       refreshPushState,
       requestAppNotifications,
       disableAppNotifications,
@@ -955,12 +862,8 @@ export function CampusProvider({ children }: { children: ReactNode }) {
       manualInstallOpen,
       openInstallPrompt,
       closeInstallPrompt,
-      notifPromptOpen,
-      openNotifPrompt,
-      closeNotifPrompt,
       notificationsEnabled,
       pushState,
-      pushChecked,
       refreshPushState,
       requestAppNotifications,
       disableAppNotifications,
