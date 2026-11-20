@@ -817,24 +817,6 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                     <strong>Log out</strong>
                   </div>
                 </button>
-                {user.role !== "admin" && (
-                  <button
-                    type="button"
-                    className="me-row me-row-danger"
-                    onClick={() => {
-                      setDeleteText("");
-                      setDeleteOpen(true);
-                    }}
-                  >
-                    <span className="me-row-icon">
-                      <Trash2 size={18} />
-                    </span>
-                    <div>
-                      <strong>Delete account</strong>
-                      <small>Permanently remove your data</small>
-                    </div>
-                  </button>
-                )}
               </div>
             </>
           ) : (
@@ -1131,6 +1113,27 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
             </Link>
           </div>
         </section>
+      )}
+
+      {!sellerId && user && user.role !== "admin" && (
+        <div className="me-menu me-menu-quiet me-danger-zone">
+          <button
+            type="button"
+            className="me-row me-row-danger"
+            onClick={() => {
+              setDeleteText("");
+              setDeleteOpen(true);
+            }}
+          >
+            <span className="me-row-icon">
+              <Trash2 size={18} />
+            </span>
+            <div>
+              <strong>Delete account</strong>
+              <small>Permanently remove your data</small>
+            </div>
+          </button>
+        </div>
       )}
 
       <Dialog open={editing} onOpenChange={setEditing}>
