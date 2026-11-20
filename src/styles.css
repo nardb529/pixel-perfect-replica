@@ -7429,3 +7429,33 @@ html.dark .plan-card {
   margin: 8px auto 20px;
   max-width: 640px;
 }
+
+/* Dashboard banner: text lives inside the banner, nothing overlaps */
+.dash-cover {
+  position: relative;
+  min-height: 128px;
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  color: #fff;
+}
+.dash-cover .dash-welcome {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.dash-cover .dash-avatar {
+  width: 68px;
+  height: 68px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+}
+.dash-cover .dash-welcome-text {
+  padding-top: 0;
+}
+.dash-cover .dash-eyebrow,
+.dash-cover .dash-welcome-text h1 {
+  color: #fff;
+}
+.dash-cover .dash-eyebrow {
+  opacity: 0.85;
+}
