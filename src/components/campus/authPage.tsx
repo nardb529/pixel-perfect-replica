@@ -16,7 +16,16 @@ import { authenticationService } from "@/services";
 import type { AccountType } from "@/lib/supabase/database.types";
 
 export function AuthPage() {
-  const [mode, setMode] = useState<"signup" | "login">("signup");
+  const [mode, setMode] = useState<"signup" | "login">(() => {
+    if (typeof window === "undefined") return "signup";
+    try {
+      return new URLSearchParams(window.location.search).get("mode") === "login"
+        ? "login"
+        : "signup";
+    } catch {
+      return "signup";
+    }
+  });
   const [isStudent, setIsStudent] = useState(true);
   const [show, setShow] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -183,9 +192,8 @@ export function AuthPage() {
               </span>
               <h1>Verify your email</h1>
               <p>
-                We sent a confirmation link to <strong>{verificationPendingEmail}</strong>. Tap the
-                link to confirm your account — if {BRAND} is added to your Home Screen, it opens
-                right inside the app; otherwise it opens in your browser.
+                We sent a confirmation link to <strong>{verificationPendingEmail}</strong>. Open
+                your inbox and confirm your email to activate your seller dashboard.
               </p>
               <Button type="button" onClick={resendConfirmation}>
                 Resend confirmation email
