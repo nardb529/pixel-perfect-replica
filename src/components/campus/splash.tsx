@@ -69,26 +69,26 @@ export function LaunchSplash() {
       role="status"
       aria-label={`${BRAND} is loading`}
     >
-      <div className="splash-glow splash-glow-a" aria-hidden="true" />
-      <div className="splash-glow splash-glow-b" aria-hidden="true" />
-      <div className="splash-rings" aria-hidden="true">
+      <div className="ls-glow ls-glow-a" aria-hidden="true" />
+      <div className="ls-glow ls-glow-b" aria-hidden="true" />
+      <div className="ls-rings" aria-hidden="true">
         <span />
         <span />
         <span />
       </div>
-      <div className="splash-center">
-        <div className="splash-emblem">
+      <div className="ls-center">
+        <div className="ls-emblem">
           <BrandMark size={72} animated />
         </div>
-        <h1 className="splash-wordmark">
+        <h1 className="ls-wordmark">
           {BRAND}
           <span>.</span>
         </h1>
-        <p className="splash-tagline">Ghana&apos;s university campus marketplace</p>
-        <div className="splash-dots" aria-hidden="true">
-          <i />
-          <i />
-          <i />
+        <p className="ls-tagline">Ghana&apos;s university campus marketplace</p>
+        <div className="ls-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
         </div>
       </div>
     </div>
