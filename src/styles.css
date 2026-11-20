@@ -7529,8 +7529,9 @@ html.dark .plan-card {
 }
 
 /* ---------- Edge-to-edge in the installed app ----------
-   The page now runs under the phone's status bar. A brand-blue strip keeps the clock and
-   battery readable on every page; the welcome page skips it so its photo reaches the top. */
+   The page runs under the phone's status bar (like TikTok). A soft fade, not a hard strip,
+   keeps the clock and battery readable. The welcome page skips it: its photo already
+   reaches the top and has its own shading. */
 @media (display-mode: standalone) {
   body::before {
     content: "";
@@ -7538,8 +7539,13 @@ html.dark .plan-card {
     top: 0;
     left: 0;
     right: 0;
-    height: env(safe-area-inset-top, 0px);
-    background: #4965f5;
+    height: calc(env(safe-area-inset-top, 0px) + 18px);
+    background: linear-gradient(
+      to bottom,
+      rgba(14, 24, 70, 0.55) 0%,
+      rgba(14, 24, 70, 0.28) 55%,
+      rgba(14, 24, 70, 0) 100%
+    );
     z-index: 60;
     pointer-events: none;
   }
