@@ -6888,3 +6888,17 @@ html:not(.dark) .app-header {
   padding: 0 14px;
   font-size: 16px;
 }
+
+/* Keep the subject of each banner photo in view on narrow phones */
+.page-banner-discover .page-banner-media {
+  object-position: 72% 30%;
+}
+.page-banner-products .page-banner-media {
+  object-position: 85% 50%;
+}
+.page-banner-services .page-banner-media {
+  object-position: 60% 40%;
+}
+.page-banner-shop .page-banner-media {
+  object-position: 60% 45%;
+}
