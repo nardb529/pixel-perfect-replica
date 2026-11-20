@@ -24,12 +24,14 @@ import {
   BellRing,
   BellOff,
   ImagePlus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useCampus } from "./store";
 import { PageBanner } from "./banners";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import {
   Shell,
   SectionTitle,
@@ -95,6 +97,9 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
   const [bannerOverride, setBannerOverride] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const dbUniversitiesRef = useRef(dbUniversities);
   dbUniversitiesRef.current = dbUniversities;
@@ -266,6 +271,32 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
     } finally {
       setUploadingBanner(false);
       if (bannerInputRef.current) bannerInputRef.current.value = "";
+    }
+  }
+
+  async function deleteMyAccount() {
+    if (deleteText.trim() !== "DELETE") return;
+    setDeleting(true);
+    try {
+      const client = getSupabaseClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please log in again, then try once more.");
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
+      const result = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(result.error || "Could not delete the account.");
+      toast.success("Your account has been deleted.");
+      setDeleteOpen(false);
+      await signOutUser().catch(() => undefined);
+      window.location.assign("/");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : toUserSafeErrorMessage(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -608,6 +639,19 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                   <LogOut size={16} />
                   Log out
                 </Button>
+                {user.role !== "admin" && (
+                  <Button
+                    variant="ghost"
+                    className="delete-account-btn"
+                    onClick={() => {
+                      setDeleteText("");
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    Delete account
+                  </Button>
+                )}
               </>
             ) : (
               <Button className="dashboard-create-btn" asChild>
@@ -1005,6 +1049,39 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
               {savingProfile ? "Saving..." : "Save profile"}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
+        <DialogContent className="mobile-dialog onboarding-dialog">
+          <DialogTitle>Delete your account?</DialogTitle>
+          <DialogDescription>
+            This permanently removes your profile, listings, photos and saved items. It cannot be
+            undone.
+          </DialogDescription>
+          <div className="modal-body">
+            <label className="delete-account-label">
+              Type <strong>DELETE</strong> to confirm
+              <input
+                className="delete-account-input"
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="characters"
+              />
+            </label>
+            <div className="modal-actions">
+              <Button variant="outline" disabled={deleting} onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleting || deleteText.trim() !== "DELETE"}
+                onClick={() => void deleteMyAccount()}
+              >
+                {deleting ? "Deleting..." : "Delete forever"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </Shell>
