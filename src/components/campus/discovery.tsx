@@ -17,10 +17,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCampus } from "./store";
+import { PageBanner } from "./banners";
 import {
   Shell,
-  HeroAmbient,
-  HeroBannerBackdrop,
   SearchBar,
   SectionTitle,
   ListingCard,
@@ -173,13 +172,7 @@ export function DiscoverPage() {
 
   return (
     <Shell>
-      <section className="surface-panel hero-panel has-hero-banner curve-accent">
-        <HeroBannerBackdrop
-          src="/banners/discover-banner.webp"
-          alt="Students shopping campus laptops, books, and essentials on CampusLoop"
-        />
-        <HeroAmbient />
-
+      <PageBanner banner="discover">
         <div className="discover-heading">
           <div>
             <p className="greeting">
@@ -197,34 +190,34 @@ export function DiscoverPage() {
           suggestions={suggestions}
           onSelectSuggestion={(s) => navigate({ to: "/listing/$id", params: { id: s.id } })}
         />
+      </PageBanner>
 
-        <div className="category-row" aria-label="Category shortcuts">
-          {shortcuts.map((s) => (
-            <button
-              type="button"
-              key={s.name}
-              className={`category-shortcut tone-${s.tone} ${category === s.name && s.name !== "All" ? "selected" : ""}`}
-              onClick={() => {
-                if (s.name === "All") {
-                  if (searching) {
-                    setQuery("");
-                    setCategory("All");
-                  } else {
-                    navigate({ to: "/products" });
-                  }
-                  return;
+      <div className="category-row" aria-label="Category shortcuts">
+        {shortcuts.map((s) => (
+          <button
+            type="button"
+            key={s.name}
+            className={`category-shortcut tone-${s.tone} ${category === s.name && s.name !== "All" ? "selected" : ""}`}
+            onClick={() => {
+              if (s.name === "All") {
+                if (searching) {
+                  setQuery("");
+                  setCategory("All");
+                } else {
+                  navigate({ to: "/products" });
                 }
-                setCategory(s.name === category ? "All" : s.name);
-              }}
-            >
-              <span className="category-icon-orb">
-                <s.icon size={19} strokeWidth={2} />
-              </span>
-              <small>{s.label || s.name}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+                return;
+              }
+              setCategory(s.name === category ? "All" : s.name);
+            }}
+          >
+            <span className="category-icon-orb">
+              <s.icon size={19} strokeWidth={2} />
+            </span>
+            <small>{s.label || s.name}</small>
+          </button>
+        ))}
+      </div>
 
       <section className="surface-panel section-panel">
         <SectionTitle
@@ -263,8 +256,8 @@ export function DiscoverPage() {
           </Empty>
         ) : results.length ? (
           <div className={searching ? "listing-grid" : "listing-carousel"}>
-            {(searching ? results : results.slice(0, 4)).map((l, idx) => (
-              <ListingCard key={l.id} listing={l} priority={idx < 4} />
+            {(searching ? results : results.slice(0, 4)).map((l) => (
+              <ListingCard key={l.id} listing={l} />
             ))}
           </div>
         ) : (
@@ -535,13 +528,7 @@ export function BrowsePage({
   return (
     <Shell>
       <PageBackButton fallbackTo="/discover" label="Back" />
-      <section className="surface-panel hero-panel browse-panel has-hero-banner curve-accent">
-        <HeroBannerBackdrop
-          src="/banners/showcase-banner.webp"
-          alt="Curated student products and campus services on CampusLoop"
-        />
-        <HeroAmbient />
-
+      <PageBanner banner={service ? "services" : "products"}>
         <PageIntro
           eyebrow={service ? "Service directory" : "Marketplace catalog"}
           title={service ? "Campus services" : "Campus products"}
@@ -561,13 +548,14 @@ export function BrowsePage({
             service ? "Search services or providers..." : "Search products or sellers..."
           }
         />
+      </PageBanner>
 
+      <div className="browse-controls">
         <div className="filter-row" role="tablist" aria-label="Categories">
           {["All", ...categoryList].map((c) => (
             <Button
               key={c}
               className="filter-chip"
-              data-active={c === category}
               variant={c === category ? "default" : "outline"}
               onClick={() => setCategory(c)}
             >
@@ -629,14 +617,14 @@ export function BrowsePage({
             />
           </div>
         </div>
-      </section>
+      </div>
 
       <section className="surface-panel section-panel">
         {visibleResults.length ? (
           <>
             <div className="listing-grid">
-              {visibleResults.map((l, idx) => (
-                <ListingCard key={l.id} listing={l} priority={idx < 4} />
+              {visibleResults.map((l) => (
+                <ListingCard key={l.id} listing={l} />
               ))}
             </div>
             {hasMore && (
