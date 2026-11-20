@@ -175,10 +175,7 @@ export function DiscoverPage() {
       <PageBanner banner="discover">
         <div className="discover-heading">
           <div>
-            <p className="greeting">
-              <span className="greeting-pulse" aria-hidden="true" />
-              Campus marketplace
-            </p>
+            <p className="greeting">Campus marketplace</p>
             <h1>What are you looking for today?</h1>
           </div>
           <span className="campus-scope-label">{university}</span>
