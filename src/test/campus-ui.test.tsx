@@ -50,6 +50,7 @@ vi.mock("@tanstack/react-router", async () => {
 
 import { AdminPage } from "@/components/campus/adminConsole";
 import { AuthPage } from "@/components/campus/authPage";
+import { DetailPage } from "@/components/campus/details";
 import { DiscoverPage } from "@/components/campus/discovery";
 import { ProfilePage } from "@/components/campus/profiles";
 import {
@@ -152,6 +153,11 @@ describe("ListingCard actions", () => {
         <ListingCard listing={serviceFixture} />
       </CampusProvider>,
     );
+
+    expect(screen.getByText(serviceFixture.title)).toBeInTheDocument();
+    expect(screen.getByText("All Universities")).toBeInTheDocument();
+    expect(screen.queryByText(serviceFixture.description)).not.toBeInTheDocument();
+    expect(screen.queryByText(serviceFixture.seller)).not.toBeInTheDocument();
 
     const contactBtn = screen.getByRole("button", { name: "Contact" });
     expect(contactBtn).toBeInTheDocument();
@@ -334,14 +340,30 @@ describe("Seller identity verification & unique Seller Shop", () => {
     ).toBe("");
   });
 
-  it("links listing seller names directly to the seller's shop page", () => {
+  it("links listing seller profiles directly to the seller's shop page inside listing details", () => {
+    function DetailHarness() {
+      const { setListings } = useCampus();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setListings([{ ...productFixture, sellerId: "seller-ama" }])}
+          >
+            Seed detail
+          </button>
+          <DetailPage id={productFixture.id} />
+        </>
+      );
+    }
+
     render(
       <CampusProvider>
-        <ListingCard listing={{ ...productFixture, sellerId: "seller-ama" }} />
+        <DetailHarness />
       </CampusProvider>,
     );
 
-    const sellerLink = screen.getByRole("link", { name: /Visit Ama Boateng's shop/i });
+    fireEvent.click(screen.getByRole("button", { name: "Seed detail" }));
+    const sellerLink = screen.getByRole("link", { name: /Open Ama Boateng's shop/i });
     expect(sellerLink).toHaveAttribute("href", "/seller/seller-ama");
   });
 
@@ -396,9 +418,7 @@ describe("Seller identity verification & unique Seller Shop", () => {
   it("renders distinct visual status indicators for Verified, Pending, and Unverified sellers", () => {
     const { rerender } = render(<SellerStatusIndicator status="verified" />);
     expect(screen.getByText("Verified Seller")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Identity & ID background check approved by Admin/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Live selfie reviewed and approved by an Admin/i)).toBeInTheDocument();
 
     rerender(<SellerStatusIndicator status="pending" />);
     expect(screen.getByText("Verification Pending")).toBeInTheDocument();

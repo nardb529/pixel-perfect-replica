@@ -10,7 +10,7 @@ import {
   universities,
   type Listing,
 } from "@/lib/campus/data";
-import { pageHead, SITE_URL } from "@/lib/campus/meta";
+import { getCanonicalSiteUrl, pageHead } from "@/lib/campus/meta";
 
 const fixtureListings: Listing[] = [
   {
@@ -177,6 +177,7 @@ describe("Campus marketplace rules", () => {
   });
 
   it("generates complete marketplace OpenGraph, Twitter, and canonical metadata", () => {
+    const baseUrl = getCanonicalSiteUrl();
     const publicHead = pageHead("Discover Campus Marketplace", "Shop student items across Ghana.", {
       path: "/discover",
     });
@@ -185,15 +186,15 @@ describe("Campus marketplace rules", () => {
         expect.objectContaining({
           title: "Discover Campus Marketplace · CampusLoop Campus Marketplace",
         }),
-        expect.objectContaining({ property: "og:url", content: `${SITE_URL}/discover` }),
+        expect.objectContaining({ property: "og:url", content: `${baseUrl}/discover` }),
         expect.objectContaining({
           property: "og:image",
-          content: `${SITE_URL}/og-marketplace.jpg`,
+          content: `${baseUrl}/og-marketplace.jpg`,
         }),
         expect.objectContaining({ name: "twitter:card", content: "summary_large_image" }),
       ]),
     );
-    expect(publicHead.links).toEqual([{ rel: "canonical", href: `${SITE_URL}/discover` }]);
+    expect(publicHead.links).toEqual([{ rel: "canonical", href: `${baseUrl}/discover` }]);
 
     const privateHead = pageHead("Seller dashboard", "Manage listings.", {
       path: "/dashboard",

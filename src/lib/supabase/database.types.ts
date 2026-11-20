@@ -11,13 +11,7 @@ export type CategoryType = "product" | "service";
 export type ListingType = "product" | "service";
 export type PriceType = "Fixed" | "Starting from" | "Price range" | "Negotiable" | "Free";
 export type ListingStatus =
-  | "Draft"
-  | "Active"
-  | "Paused"
-  | "Sold"
-  | "Unavailable"
-  | "Rejected"
-  | "Archived";
+  "Draft" | "Active" | "Paused" | "Sold" | "Unavailable" | "Rejected" | "Archived";
 export type AudienceScope = "single" | "multiple" | "all";
 export type ReportReason =
   | "Scam or suspicious activity"

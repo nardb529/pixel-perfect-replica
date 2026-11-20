@@ -8,6 +8,7 @@ import {
   Laptop,
   Maximize2,
   MessageCircle,
+  MoreHorizontal,
   PlusSquare,
   Share,
   Smartphone,
@@ -37,6 +38,10 @@ export function OnboardingPrompts() {
     dismissSellerPrompts,
     manualInstallOpen,
     closeInstallPrompt,
+    notifPromptOpen,
+    closeNotifPrompt,
+    pushState,
+    refreshPushState,
     requestAppNotifications,
   } = useCampus();
 
@@ -59,6 +64,7 @@ export function OnboardingPrompts() {
 
   const showSellerNotif =
     Boolean(user) && sellerPostAuthStage === "notifications" && pathname === "/dashboard";
+  const showNotifDialog = showSellerNotif || notifPromptOpen;
 
   const showSellerInstall =
     Boolean(user) &&
@@ -68,7 +74,7 @@ export function OnboardingPrompts() {
 
   const showBuyerInstall = buyerInstallOpen && pathname === "/discover" && !isStandalone;
 
-  const showInstallDialog = showSellerNotif
+  const showInstallDialog = showNotifDialog
     ? false
     : showSellerInstall || showBuyerInstall || manualInstallOpen;
 
@@ -78,16 +84,34 @@ export function OnboardingPrompts() {
     if (manualInstallOpen) closeInstallPrompt();
   }
 
+  function handleCloseNotif(enabled: boolean) {
+    if (notifPromptOpen) closeNotifPrompt();
+    if (showSellerNotif) completeNotificationStep(enabled);
+  }
+
   async function handleEnableNotifications() {
+    if (pushState === "blocked") {
+      const refreshed = await refreshPushState();
+      if (refreshed === "on") {
+        toast.success("Notifications are now turned on");
+        handleCloseNotif(true);
+      } else {
+        toast.info(
+          "Notifications are still blocked in browser settings. Allow notifications for this site and tap Check status again.",
+        );
+      }
+      return;
+    }
+
     const result = await requestAppNotifications();
     if (result === "granted") {
-      toast.success("Notifications enabled for your seller account");
+      toast.success("Notifications turned on for this device");
     } else if (result === "denied") {
       toast.info("Notifications blocked in browser settings");
     } else if (result === "unsupported") {
-      toast.info("Notifications are not supported in this browser");
+      toast.info("Add CampusLoop to your Home Screen to turn on notifications");
     }
-    completeNotificationStep(result === "granted");
+    handleCloseNotif(result === "granted");
   }
 
   async function handleInstallClick() {
@@ -106,7 +130,7 @@ export function OnboardingPrompts() {
 
     toast.info(
       deviceTab === "ios"
-        ? "Tap Safari's Share icon, then choose Add to Home Screen"
+        ? "Tap ••• in Safari, tap Share, then choose Add to Home Screen"
         : deviceTab === "desktop"
           ? isMacSafari
             ? "Use Safari File menu -> Add to Dock"
@@ -118,9 +142,9 @@ export function OnboardingPrompts() {
   return (
     <>
       <Dialog
-        open={showSellerNotif}
+        open={showNotifDialog}
         onOpenChange={(open) => {
-          if (!open) completeNotificationStep(false);
+          if (!open) handleCloseNotif(false);
         }}
       >
         <DialogContent className="mobile-dialog onboarding-dialog">
@@ -170,10 +194,15 @@ export function OnboardingPrompts() {
             </div>
 
             <div className="onboarding-copy">
-              <DialogTitle className="onboarding-title">Turn on seller alerts</DialogTitle>
+              <DialogTitle className="onboarding-title">
+                {pushState === "blocked"
+                  ? "Allow notifications in settings"
+                  : "Turn on your notifications"}
+              </DialogTitle>
               <DialogDescription className="onboarding-desc">
-                Never miss a campus buyer — get instant alerts when students save your items or
-                reach out on {BRAND}.
+                {pushState === "blocked"
+                  ? `Notifications are currently blocked for ${BRAND}. Open your browser or phone site settings, allow Notifications, then tap Check status.`
+                  : `Never miss a message or update — get instant alerts on your device from ${BRAND}, even when the app is closed.`}
               </DialogDescription>
             </div>
 
@@ -182,27 +211,29 @@ export function OnboardingPrompts() {
                 <span className="perk-badge">
                   <CheckCircle2 size={15} />
                 </span>
-                <span>Instant enquiry alerts while browsing</span>
+                <span>Instant messages &amp; campus updates on your lock screen</span>
               </div>
               <div className="onboarding-perk-pill">
                 <span className="perk-badge">
                   <CheckCircle2 size={15} />
                 </span>
-                <span>Real-time updates when listings trend</span>
+                <span>Stays turned on automatically once enabled</span>
               </div>
             </div>
 
             <div className="onboarding-actions">
               <Button className="onboarding-cta" onClick={handleEnableNotifications}>
                 <BellRing size={17} />
-                <span>Enable Notifications</span>
+                <span>
+                  {pushState === "blocked" ? "Check notification status" : "Turn on notifications"}
+                </span>
               </Button>
               <Button
                 variant="ghost"
                 className="onboarding-skip"
-                onClick={() => completeNotificationStep(false)}
+                onClick={() => handleCloseNotif(false)}
               >
-                Not now
+                Remind me later
               </Button>
             </div>
           </div>
@@ -327,12 +358,18 @@ export function OnboardingPrompts() {
                       <div className="install-step">
                         <span className="step-num">1</span>
                         <p>
-                          Tap <Share size={14} className="inline-icon" /> <strong>Share</strong> in
-                          your Safari bar
+                          Tap <MoreHorizontal size={15} className="inline-icon" />{" "}
+                          <strong>•••</strong> in your Safari toolbar
                         </p>
                       </div>
                       <div className="install-step">
                         <span className="step-num">2</span>
+                        <p>
+                          Tap <Share size={14} className="inline-icon" /> <strong>Share</strong>
+                        </p>
+                      </div>
+                      <div className="install-step">
+                        <span className="step-num">3</span>
                         <p>
                           Pick <PlusSquare size={14} className="inline-icon" />{" "}
                           <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
@@ -446,11 +483,12 @@ const IN_APP_BROWSER_PATTERN = /FBAN|FBAV|Instagram|Snapchat|TikTok|Line\/|Micro
  * admin area are never blocked.
  */
 export function InstallGate() {
-  const { isIOS, canNativeInstall, triggerNativeInstall } = useCampus();
+  const { isIOS, canNativeInstall, triggerNativeInstall, user, authLoading } = useCampus();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [blocked, setBlocked] = useState(false);
   const [inAppBrowser, setInAppBrowser] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [verifiedEmailFlow, setVerifiedEmailFlow] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -463,6 +501,18 @@ export function InstallGate() {
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
     setInAppBrowser(IN_APP_BROWSER_PATTERN.test(ua));
     setBlocked(isPhone && !standalone && !BOT_PATTERN.test(ua));
+
+    const searchAndHash = `${window.location.search}${window.location.hash}`.toLowerCase();
+    if (
+      searchAndHash.includes("verified=1") ||
+      searchAndHash.includes("type=signup") ||
+      searchAndHash.includes("type=email") ||
+      searchAndHash.includes("token_hash=") ||
+      searchAndHash.includes("access_token=") ||
+      searchAndHash.includes("code=")
+    ) {
+      setVerifiedEmailFlow(true);
+    }
 
     const onInstalled = () => setBlocked(false);
     window.addEventListener("appinstalled", onInstalled);
@@ -486,54 +536,143 @@ export function InstallGate() {
       role="dialog"
       aria-modal="true"
       aria-label={`Install ${BRAND}`}
-      className="fixed inset-0 z-[2147483000] flex items-center justify-center overflow-y-auto bg-background p-6"
+      className="install-gate-screen"
     >
-      <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
-        <img
-          src="/pwa-192x192.png"
-          alt={`${BRAND} app icon`}
-          width={84}
-          height={84}
-          className="rounded-2xl shadow-lg"
-        />
-        <h1 className="text-2xl font-bold">Install {BRAND} to continue</h1>
-        <p className="text-sm text-muted-foreground">
-          {BRAND} works as an app on your phone. Add it to your Home Screen, then open it from the
-          icon. It is free and takes 10 seconds.
-        </p>
+      <div className="install-gate-backdrop" aria-hidden="true">
+        <span className="install-gate-orb orb-one" />
+        <span className="install-gate-orb orb-two" />
+        <span className="install-gate-orb orb-three" />
+      </div>
+
+      <div className="surface-panel curve-accent install-gate-card">
+        <div className="onboarding-stage install-stage install-gate-stage" aria-hidden="true">
+          <span className="stage-orb stage-orb-a" />
+          <span className="stage-orb stage-orb-c" />
+          <svg
+            className="stage-waves violet"
+            viewBox="0 0 360 120"
+            fill="none"
+            preserveAspectRatio="none"
+          >
+            <path
+              className="stage-wave-path wave-one"
+              d="M-10 46 C 78 96, 178 18, 266 66 C 310 90, 342 64, 370 38"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+            <path
+              className="stage-wave-path wave-two"
+              d="M-10 92 C 84 44, 186 106, 274 52 C 314 28, 344 42, 370 68"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+
+          <div className="notif-float-pill install-pill-left">
+            <Zap size={12} />
+            <span>1-tap launch</span>
+          </div>
+          <div className="notif-float-pill install-pill-right">
+            <Maximize2 size={12} />
+            <span>Full screen</span>
+          </div>
+
+          <div className="install-centerpiece">
+            <span className="install-orbit-halo" />
+            <div className="install-icon-shell">
+              <img
+                src="/pwa-192x192.png"
+                alt={`${BRAND} app icon`}
+                className="onboarding-app-icon"
+                width={72}
+                height={72}
+              />
+              <span className="install-corner-badge">
+                <Download size={13} />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {verifiedEmailFlow && (
+          <div className="install-gate-verified" role="status">
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <strong>
+                {!authLoading && user
+                  ? "Email verified & signed in!"
+                  : "Email confirmation detected"}
+              </strong>
+              <span>
+                Open <strong>{BRAND}</strong> from your Home Screen icon to continue inside the app
+                — or follow the steps below if you haven&apos;t added it yet.
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="install-gate-copy">
+          <h1>Install {BRAND} to continue</h1>
+          <p>
+            {BRAND} runs as a fast full-screen app on your phone. Add it to your Home Screen in 10
+            seconds, then launch from its icon.
+          </p>
+        </div>
 
         {inAppBrowser ? (
-          <div className="install-steps-box w-full text-left">
+          <div className="install-steps-box w-full text-left install-gate-steps">
             <div className="install-step">
               <span className="step-num">1</span>
               <p>
-                You are inside another app's browser. Tap the <strong>⋯</strong> or Share menu and
-                choose <strong>Open in {isIOS ? "Safari" : "Chrome"}</strong>.
+                You are inside another app&apos;s browser. Tap{" "}
+                <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong> or the
+                Share menu and choose <strong>Open in {isIOS ? "Safari" : "Chrome"}</strong>.
               </p>
             </div>
             <div className="install-step">
               <span className="step-num">2</span>
-              <p>Then {isIOS ? "tap Share, then Add to Home Screen" : "tap Install app"}.</p>
+              <p>
+                {isIOS ? (
+                  <>
+                    Tap <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong>,
+                    tap <Share size={14} className="inline-icon" /> <strong>Share</strong>, then
+                    choose <PlusSquare size={14} className="inline-icon" />{" "}
+                    <strong>Add to Home Screen</strong>.
+                  </>
+                ) : (
+                  <>
+                    Then tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                  </>
+                )}
+              </p>
             </div>
           </div>
         ) : isIOS ? (
-          <div className="install-steps-box w-full text-left">
+          <div className="install-steps-box w-full text-left install-gate-steps">
             <div className="install-step">
               <span className="step-num">1</span>
               <p>
-                Tap <Share size={14} className="inline-icon" /> <strong>Share</strong> at the bottom
-                of Safari
+                Tap <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong> in
+                your Safari toolbar
               </p>
             </div>
             <div className="install-step">
               <span className="step-num">2</span>
               <p>
-                Choose <PlusSquare size={14} className="inline-icon" />{" "}
-                <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
+                Tap <Share size={14} className="inline-icon" /> <strong>Share</strong>
               </p>
             </div>
             <div className="install-step">
               <span className="step-num">3</span>
+              <p>
+                Click <PlusSquare size={14} className="inline-icon" />{" "}
+                <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
+              </p>
+            </div>
+            <div className="install-step">
+              <span className="step-num">4</span>
               <p>
                 Open <strong>{BRAND}</strong> from your Home Screen
               </p>
@@ -548,14 +687,14 @@ export function InstallGate() {
                 disabled={installing}
               >
                 <Download size={17} />
-                <span>{installing ? "Opening installer..." : "Install app"}</span>
+                <span>{installing ? "Opening installer..." : "Add to Home Screen"}</span>
               </Button>
             ) : (
-              <div className="install-steps-box w-full text-left">
+              <div className="install-steps-box w-full text-left install-gate-steps">
                 <div className="install-step">
                   <span className="step-num">1</span>
                   <p>
-                    Open your browser menu (<strong>⋮</strong>) in Chrome
+                    Open your browser menu (<strong>⋮</strong>) in Chrome or Edge
                   </p>
                 </div>
                 <div className="install-step">
@@ -564,13 +703,19 @@ export function InstallGate() {
                     Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>
                   </p>
                 </div>
+                <div className="install-step">
+                  <span className="step-num">3</span>
+                  <p>
+                    Open <strong>{BRAND}</strong> from your Home Screen
+                  </p>
+                </div>
               </div>
             )}
           </>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Already installed? Open {BRAND} from its icon on your Home Screen.
+        <p className="install-gate-footnote">
+          Already installed? Open <strong>{BRAND}</strong> from its icon on your Home Screen.
         </p>
       </div>
     </div>

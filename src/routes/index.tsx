@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowRight, ArrowUpRight, BookOpen, Camera, Laptop, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BrandMark, ThemeToggle } from "@/components/campus/shared";
+import { BrandMark, PagePendingFallback, ThemeToggle } from "@/components/campus/shared";
 import { useCampus } from "@/components/campus/store";
 import { BRAND } from "@/lib/campus/data";
 import { pageHead } from "@/lib/campus/meta";
@@ -28,6 +28,24 @@ function Welcome() {
     void router.preloadRoute({ to: "/discover" }).catch(() => undefined);
     void router.preloadRoute({ to: "/auth" }).catch(() => undefined);
   }, [router]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      void navigate({ to: "/discover", replace: true });
+    }
+  }, [authLoading, navigate, user]);
+
+  if (authLoading) {
+    return (
+      <div className="launch-screen">
+        <PagePendingFallback />
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/discover" replace />;
+  }
 
   function handleExplore() {
     triggerBuyerInstallPrompt();

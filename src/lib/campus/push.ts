@@ -2,6 +2,27 @@ import { getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 
 export type PushNotificationState = "on" | "off" | "blocked" | "unsupported";
 
+const PUSH_OPT_IN_STORAGE_KEY = "cl_push_enabled_v1";
+
+export function getStoredPushOptIn(): "1" | "0" | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const val = window.localStorage.getItem(PUSH_OPT_IN_STORAGE_KEY);
+    return val === "1" || val === "0" ? val : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredPushOptIn(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PUSH_OPT_IN_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -41,15 +62,28 @@ async function getReadyServiceWorkerRegistration(): Promise<ServiceWorkerRegistr
 }
 
 export async function getPushNotificationState(): Promise<PushNotificationState> {
-  if (!isPushSupported()) return "unsupported";
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
   if (Notification.permission === "denied") return "blocked";
+  if (!isPushSupported()) {
+    return Notification.permission === "granted" && getStoredPushOptIn() === "1"
+      ? "on"
+      : "unsupported";
+  }
   if (Notification.permission !== "granted") return "off";
+
+  const storedPref = getStoredPushOptIn();
+  if (storedPref === "0") return "off";
+  if (storedPref === "1") return "on";
 
   try {
     const reg = await getReadyServiceWorkerRegistration();
     if (!reg) return "off";
     const subscription = await reg.pushManager.getSubscription();
-    return subscription ? "on" : "off";
+    if (subscription) {
+      setStoredPushOptIn(true);
+      return "on";
+    }
+    return "off";
   } catch {
     return "off";
   }

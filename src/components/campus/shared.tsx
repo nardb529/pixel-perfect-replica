@@ -27,7 +27,8 @@ import {
   Sun,
   Moon,
   Check,
-  BadgeCheck,
+  Bell,
+  BellRing,
   Globe,
   GraduationCap,
   MessageCircle,
@@ -391,10 +392,43 @@ export function UniversitySelect({ compact = false }: { compact?: boolean }) {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { user, saved } = useCampus();
+  const {
+    user,
+    saved,
+    pushState,
+    pushChecked,
+    unreadNotificationCount,
+    openNotifPrompt,
+    requestAppNotifications,
+    openInstallPrompt,
+    isStandalone,
+  } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
+
+  function handleHeaderNotifClick() {
+    if (pushState === "on") {
+      if (user) {
+        void navigate({ to: "/dashboard" });
+      } else {
+        toast.success("Notifications are active on this device");
+      }
+      return;
+    }
+    openNotifPrompt();
+  }
+
+  async function handleQuickEnablePush() {
+    const result = await requestAppNotifications();
+    if (result === "granted") {
+      toast.success("Notifications turned on for this device");
+    } else if (result === "denied") {
+      openNotifPrompt();
+    } else if (result === "unsupported") {
+      openNotifPrompt();
+    }
+  }
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof router.preloadRoute !== "function") return;
@@ -478,6 +512,29 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="header-actions">
               <UniversitySelect />
               <ThemeToggle compact />
+              <button
+                type="button"
+                onClick={handleHeaderNotifClick}
+                className={`header-icon-btn header-notif-btn ${
+                  pushChecked && pushState !== "on" ? "needs-attention" : ""
+                }`}
+                title={
+                  pushState === "on"
+                    ? unreadNotificationCount > 0
+                      ? `Notifications · ${unreadNotificationCount} unread`
+                      : "Notifications are on"
+                    : "Turn on your notifications"
+                }
+                aria-label={pushState === "on" ? "Notifications" : "Turn on your notifications"}
+              >
+                {pushChecked && pushState !== "on" ? <BellRing size={17} /> : <Bell size={17} />}
+                {pushState === "on" && unreadNotificationCount > 0 && (
+                  <span className="save-count">{unreadNotificationCount}</span>
+                )}
+                {pushChecked && pushState !== "on" && (
+                  <span className="header-notif-dot" aria-hidden="true" />
+                )}
+              </button>
               {user?.role === "admin" && (
                 <Link
                   to="/admin"
@@ -509,7 +566,51 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="market-main">{children}</main>
+      <main className="market-main">
+        {pushChecked && pushState !== "on" && (
+          <div className="notif-persistent-bar" role="region" aria-label="Turn on notifications">
+            <span className="notif-persistent-icon" aria-hidden="true">
+              <BellRing size={16} />
+            </span>
+            <div className="notif-persistent-copy">
+              <strong>
+                {pushState === "blocked"
+                  ? "Notifications are blocked in device settings"
+                  : pushState === "unsupported" && !isStandalone
+                    ? "Add CampusLoop to Home Screen for alerts"
+                    : "Turn on your notifications"}
+              </strong>
+              <span>
+                {pushState === "blocked"
+                  ? "Allow CampusLoop notifications in site settings so updates reach your phone."
+                  : pushState === "unsupported" && !isStandalone
+                    ? "Open from your Home Screen icon to turn on phone notifications."
+                    : "Get CampusLoop messages and updates on your device even when closed."}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="notif-persistent-btn"
+              onClick={() => {
+                if (pushState === "off") {
+                  void handleQuickEnablePush();
+                } else if (pushState === "unsupported" && !isStandalone) {
+                  openInstallPrompt();
+                } else {
+                  openNotifPrompt();
+                }
+              }}
+            >
+              {pushState === "blocked"
+                ? "Fix"
+                : pushState === "unsupported" && !isStandalone
+                  ? "Install app"
+                  : "Turn on"}
+            </button>
+          </div>
+        )}
+        {children}
+      </main>
 
       <footer className="market-footer-wrap">
         <div className="market-footer surface-panel">
@@ -629,7 +730,6 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
   const isSaved = saved.includes(listing.id);
   const hasPrice = listing.type === "product" || listing.price > 0;
   const isService = listing.type === "service";
-  const metaTag = isService ? "Service" : listing.condition === "New" ? "New" : listing.condition;
   const enquiryText = `Hi ${listing.seller}, I saw “${listing.title}” on CampusLoop. Is it still available?`;
   const whatsappUrl = buildWhatsAppUrl(listing.contact, enquiryText);
   const phoneHref = buildPhoneHref(listing.contact);
@@ -659,7 +759,7 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
               />
             ) : (
               <div className="listing-image-fallback">
-                {isService ? <Briefcase size={24} /> : <ShoppingBag size={24} />}
+                {isService ? <Briefcase size={26} /> : <ShoppingBag size={26} />}
                 <span>{listing.category}</span>
               </div>
             )}
@@ -675,14 +775,9 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
           </button>
         </div>
         <div className="listing-info">
-          <div className="listing-meta-top">
-            <span className="listing-category">{listing.category}</span>
-            {metaTag && <span className="listing-kind">· {metaTag}</span>}
-          </div>
           <Link to="/listing/$id" params={{ id: listing.id }}>
             <h3>{listing.title}</h3>
           </Link>
-          {isService && <p className="listing-desc">{listing.description}</p>}
           <p className={`listing-price ${!hasPrice ? "on-request" : ""}`}>
             {isService && hasPrice && listing.priceType !== "Free" && <small>From </small>}
             {formatListingPrice(listing)}
@@ -698,20 +793,6 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                   : listing.university}
             </span>
           </p>
-          <div className="listing-byline">
-            <Link
-              to="/seller/$id"
-              params={{ id: listing.sellerId || listing.id }}
-              className="listing-seller-link inline-flex items-center gap-1"
-              aria-label={`Visit ${listing.seller}'s shop`}
-            >
-              <span>{listing.seller}</span>
-              {listing.verificationStatus === "verified" && (
-                <BadgeCheck size={12} aria-label="Verified seller" className="text-primary" />
-              )}
-            </Link>
-            <span>{listing.time}</span>
-          </div>
           <button
             type="button"
             className={`listing-cta-btn ${isService ? "is-service" : "is-product"}`}

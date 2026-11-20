@@ -15,6 +15,11 @@ export interface SignUpPayload {
   isStudent?: boolean | undefined;
 }
 
+function getEmailRedirectUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return `${window.location.origin}/dashboard?verified=1`;
+}
+
 export const authenticationService = {
   async getSession(): Promise<Session | null> {
     const client = getSupabaseClient();
@@ -43,8 +48,7 @@ export const authenticationService = {
 
   async signUp(payload: SignUpPayload) {
     const supabase = requireSupabase();
-    const redirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined;
+    const redirectTo = getEmailRedirectUrl();
     const { data, error } = await supabase.auth.signUp({
       email: payload.email.trim().toLowerCase(),
       password: payload.password,
@@ -89,9 +93,11 @@ export const authenticationService = {
 
   async resendVerificationEmail(email: string) {
     const supabase = requireSupabase();
+    const redirectTo = getEmailRedirectUrl();
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: email.trim().toLowerCase(),
+      ...(redirectTo ? { options: { emailRedirectTo: redirectTo } } : {}),
     });
     if (error) throw error;
   },

@@ -528,7 +528,7 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
                 </Button>
                 <Button
                   variant="outline"
-                  className="profile-edit-btn"
+                  className="profile-edit-btn profile-logout-btn"
                   onClick={() => void signOutUser()}
                 >
                   <LogOut size={16} />
@@ -692,10 +692,10 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
 
             {isIOS && (
               <div className="rounded-xl border border-border/80 bg-muted/40 p-3 text-xs leading-relaxed text-foreground">
-                <strong>iPhone guide:</strong> Tap <strong>Share</strong>, choose{" "}
-                <strong>Add to Home Screen</strong>, open CampusLoop from your Home Screen, and tap{" "}
-                <strong>Turn on notifications</strong> (<strong>iOS 16.4 or later</strong> is
-                required).
+                <strong>iPhone guide:</strong> Tap <strong>•••</strong> in Safari, tap{" "}
+                <strong>Share</strong>, choose <strong>Add to Home Screen</strong>, open CampusLoop
+                from your Home Screen, and tap <strong>Turn on notifications</strong> (
+                <strong>iOS 16.4 or later</strong> is required).
               </div>
             )}
 

@@ -183,8 +183,9 @@ export function AuthPage() {
               </span>
               <h1>Verify your email</h1>
               <p>
-                We sent a confirmation link to <strong>{verificationPendingEmail}</strong>. Open
-                your inbox and confirm your email to activate your seller dashboard.
+                We sent a confirmation link to <strong>{verificationPendingEmail}</strong>. Tap the
+                link to confirm your account — if {BRAND} is added to your Home Screen, it opens
+                right inside the app; otherwise it opens in your browser.
               </p>
               <Button type="button" onClick={resendConfirmation}>
                 Resend confirmation email
