@@ -25,6 +25,7 @@ import {
   BellOff,
   ImagePlus,
   Trash2,
+  LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -441,9 +442,6 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
       {sellerId && (
         <PageBanner banner="shop" image={shopBannerUrl} className="shop-banner">
           <div className="shop-banner-top">
-            <span className="shop-banner-label">
-              {profile?.name ? `${profile.name}’s Shop` : "Campus shop"}
-            </span>
             {isShopOwner && (
               <>
                 <input
@@ -468,199 +466,384 @@ export function ProfilePage({ sellerId }: { sellerId?: string }) {
         </PageBanner>
       )}
 
-      <section className={`profile-hero-panel ${sellerId ? "shop-hero" : "own-hero"}`}>
-        <div className="profile-top">
-          <div className="profile-identity-row">
-            {safeProfileAvatar ? (
-              <img
-                className="profile-avatar"
-                src={safeProfileAvatar}
-                alt={profile?.name || "Profile photo"}
-                decoding="async"
-              />
-            ) : (
-              <span className="profile-avatar">
-                {profile ? (
-                  profile.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join("")
-                ) : (
-                  <UserRound size={30} />
-                )}
-              </span>
-            )}
-            <div className="profile-heading">
-              <p className="greeting">
-                <span className="greeting-pulse" aria-hidden="true" />
-                {sellerId ? "Seller shop storefront" : user ? "Seller studio" : "Buyer pass"}
-              </p>
-              <h1 className="seller-name-inline">
-                {sellerId ? `${profile?.name || "Seller"}’s Shop` : profile?.name || "Guest buyer"}
-                {profile?.verificationStatus === "verified" && (
-                  <BadgeCheck
-                    size={18}
-                    className="verified-inline-icon"
-                    aria-label="Verified campus seller"
-                  />
-                )}
-              </h1>
-              <p>
-                {profile?.username ? `@${profile.username} · ` : ""}
-                {affiliations.length > 1
-                  ? affiliations.join(" · ")
-                  : profile?.university || `Browsing ${university}`}
-              </p>
-              <small>
-                {profile?.capability || "Browse & contact sellers without an account"}
-                {profile?.verificationStatus === "verified" ? " · Verified seller" : ""}
-              </small>
-            </div>
-          </div>
-          {user && !sellerId && (
-            <Button
-              variant="outline"
-              className="profile-edit-btn"
-              onClick={() => {
-                setAvatar(user.avatar);
-                setEditing(true);
-              }}
-            >
-              <Pencil size={15} />
-              Edit profile
-            </Button>
-          )}
-        </div>
-
-        {profile?.bio && <p className="profile-bio">{profile.bio}</p>}
-
-        {sellerId && profile && <SellerStatusIndicator status={profile.verificationStatus} />}
-
-        {sellerId && profile && (
-          <div className="shop-summary-bar">
-            <div className="shop-metrics tabular-nums">
-              <span>
-                <strong>{active.length}</strong>{" "}
-                <small>{active.length === 1 ? "Listing" : "Total items"}</small>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                <strong>{active.filter((i) => i.type === "product").length}</strong>{" "}
-                <small>Products</small>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                <strong>{active.filter((i) => i.type === "service").length}</strong>{" "}
-                <small>Services</small>
-              </span>
-            </div>
-
-            <div className="shop-cta-row">
-              {whatsappHref && (
-                <Button asChild>
-                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle size={15} />
-                    Message seller
-                  </a>
-                </Button>
+      {sellerId && (
+        <section className="profile-hero-panel shop-hero">
+          <div className="profile-top">
+            <div className="profile-identity-row">
+              {safeProfileAvatar ? (
+                <img
+                  className="profile-avatar"
+                  src={safeProfileAvatar}
+                  alt={profile?.name || "Profile photo"}
+                  decoding="async"
+                />
+              ) : (
+                <span className="profile-avatar">
+                  {profile ? (
+                    profile.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                  ) : (
+                    <UserRound size={30} />
+                  )}
+                </span>
               )}
-              {phoneHref && (
-                <Button variant="outline" asChild>
-                  <a href={phoneHref}>
-                    <Phone size={15} />
-                    Call
-                  </a>
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => void shareShop()}>
-                <Share2 size={15} />
-                Share shop
+              <div className="profile-heading">
+                <p className="greeting">
+                  {sellerId ? "Seller shop storefront" : user ? "Seller studio" : "Buyer pass"}
+                </p>
+                <h1 className="seller-name-inline">
+                  {sellerId
+                    ? `${profile?.name || "Seller"}’s Shop`
+                    : profile?.name || "Guest buyer"}
+                  {profile?.verificationStatus === "verified" && (
+                    <BadgeCheck
+                      size={18}
+                      className="verified-inline-icon"
+                      aria-label="Verified campus seller"
+                    />
+                  )}
+                </h1>
+                <p>
+                  {profile?.username ? `@${profile.username} · ` : ""}
+                  {affiliations.length > 1
+                    ? affiliations.join(" · ")
+                    : profile?.university || `Browsing ${university}`}
+                </p>
+                <small>
+                  {profile?.capability || "Browse & contact sellers without an account"}
+                  {profile?.verificationStatus === "verified" ? " · Verified seller" : ""}
+                </small>
+              </div>
+            </div>
+            {user && !sellerId && (
+              <Button
+                variant="outline"
+                className="profile-edit-btn"
+                onClick={() => {
+                  setAvatar(user.avatar);
+                  setEditing(true);
+                }}
+              >
+                <Pencil size={15} />
+                Edit profile
               </Button>
-            </div>
+            )}
           </div>
-        )}
 
-        {profile && !sellerId && (
-          <p className="profile-contact-note">
-            <MessageCircle size={15} />
-            <span>
-              Preferred contact: <strong>{profile.contact}</strong>
-              {profile.contactDetails ? ` · ${profile.contactDetails}` : ""}
-            </span>
-          </p>
-        )}
+          {profile?.bio && <p className="profile-bio">{profile.bio}</p>}
 
-        {!sellerId && user && (
-          <div className="profile-stats-strip tabular-nums">
-            <span>
-              <strong>{active.length}</strong>
-              <small>Listings</small>
-            </span>
-            <span>
-              <strong>{favourites.length}</strong>
-              <small>Saved</small>
-            </span>
-            <span>
-              <strong>{likedList.length}</strong>
-              <small>Liked</small>
-            </span>
-          </div>
-        )}
+          {sellerId && profile && <SellerStatusIndicator status={profile.verificationStatus} />}
 
-        {!sellerId && (
-          <div className="quick-actions profile-actions">
-            {user ? (
-              <>
-                {user.role === "admin" && (
-                  <Button variant="outline" className="admin-launch-btn" asChild>
-                    <Link to="/admin">
-                      <Shield size={15} />
-                      Admin Console
-                    </Link>
+          {sellerId && profile && (
+            <div className="shop-summary-bar">
+              <div className="shop-metrics tabular-nums">
+                <span>
+                  <strong>{active.length}</strong>{" "}
+                  <small>{active.length === 1 ? "Listing" : "Total items"}</small>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  <strong>{active.filter((i) => i.type === "product").length}</strong>{" "}
+                  <small>Products</small>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  <strong>{active.filter((i) => i.type === "service").length}</strong>{" "}
+                  <small>Services</small>
+                </span>
+              </div>
+
+              <div className="shop-cta-row">
+                {whatsappHref && (
+                  <Button asChild>
+                    <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle size={15} />
+                      Message seller
+                    </a>
                   </Button>
                 )}
-                {user.id && (
+                {phoneHref && (
                   <Button variant="outline" asChild>
-                    <Link to="/seller/$id" params={{ id: user.id }}>
-                      <StoreIcon size={15} />
-                      View my shop
-                    </Link>
+                    <a href={phoneHref}>
+                      <Phone size={15} />
+                      Call
+                    </a>
                   </Button>
                 )}
-                <Button className="dashboard-create-btn" asChild>
-                  <Link to="/dashboard">Dashboard</Link>
+                <Button variant="outline" onClick={() => void shareShop()}>
+                  <Share2 size={15} />
+                  Share shop
                 </Button>
-                <Button
-                  variant="outline"
-                  className="profile-edit-btn"
-                  onClick={() => void signOutUser()}
-                >
-                  <LogOut size={16} />
-                  Log out
-                </Button>
-                {user.role !== "admin" && (
+              </div>
+            </div>
+          )}
+
+          {profile && !sellerId && (
+            <p className="profile-contact-note">
+              <MessageCircle size={15} />
+              <span>
+                Preferred contact: <strong>{profile.contact}</strong>
+                {profile.contactDetails ? ` · ${profile.contactDetails}` : ""}
+              </span>
+            </p>
+          )}
+
+          {!sellerId && user && (
+            <div className="profile-stats-strip tabular-nums">
+              <span>
+                <strong>{active.length}</strong>
+                <small>Listings</small>
+              </span>
+              <span>
+                <strong>{favourites.length}</strong>
+                <small>Saved</small>
+              </span>
+              <span>
+                <strong>{likedList.length}</strong>
+                <small>Liked</small>
+              </span>
+            </div>
+          )}
+
+          {!sellerId && (
+            <div className="quick-actions profile-actions">
+              {user ? (
+                <>
+                  {user.role === "admin" && (
+                    <Button variant="outline" className="admin-launch-btn" asChild>
+                      <Link to="/admin">
+                        <Shield size={15} />
+                        Admin Console
+                      </Link>
+                    </Button>
+                  )}
+                  {user.id && (
+                    <Button variant="outline" asChild>
+                      <Link to="/seller/$id" params={{ id: user.id }}>
+                        <StoreIcon size={15} />
+                        View my shop
+                      </Link>
+                    </Button>
+                  )}
+                  <Button className="dashboard-create-btn" asChild>
+                    <Link to="/dashboard">Dashboard</Link>
+                  </Button>
                   <Button
-                    variant="ghost"
-                    className="delete-account-btn"
+                    variant="outline"
+                    className="profile-edit-btn"
+                    onClick={() => void signOutUser()}
+                  >
+                    <LogOut size={16} />
+                    Log out
+                  </Button>
+                  {user.role !== "admin" && (
+                    <Button
+                      variant="ghost"
+                      className="delete-account-btn"
+                      onClick={() => {
+                        setDeleteText("");
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 size={15} />
+                      Delete account
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <Button className="dashboard-create-btn" asChild>
+                  <Link to="/auth">Verify &amp; Sell on CampusLoop</Link>
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+      {!sellerId && (
+        <section className="me-hero">
+          <div className="me-cover" aria-hidden="true" />
+          <div className="me-card">
+            <div className="me-avatar-wrap">
+              {safeProfileAvatar ? (
+                <img
+                  className="me-avatar"
+                  src={safeProfileAvatar}
+                  alt={profile?.name || "Profile photo"}
+                  decoding="async"
+                />
+              ) : (
+                <span className="me-avatar">
+                  {profile ? (
+                    profile.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                  ) : (
+                    <UserRound size={38} />
+                  )}
+                </span>
+              )}
+              {user && (
+                <button
+                  type="button"
+                  className="me-avatar-edit"
+                  aria-label="Edit profile photo"
+                  onClick={() => {
+                    setAvatar(user.avatar);
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
+
+            <h1 className="me-name">
+              {profile?.name || "Guest buyer"}
+              {profile?.verificationStatus === "verified" && (
+                <BadgeCheck
+                  size={20}
+                  className="verified-inline-icon"
+                  aria-label="Verified campus seller"
+                />
+              )}
+            </h1>
+            <p className="me-sub">
+              {profile?.username ? `@${profile.username} · ` : ""}
+              {affiliations.length > 1
+                ? affiliations.join(" · ")
+                : profile?.university || `Browsing ${university}`}
+            </p>
+            <div className="me-chips">
+              <span className="me-chip">
+                {profile?.capability || "Browse & contact sellers without an account"}
+              </span>
+              {profile?.verificationStatus === "verified" && (
+                <span className="me-chip me-chip-ok">
+                  <ShieldCheck size={12} />
+                  Verified seller
+                </span>
+              )}
+            </div>
+            {profile?.bio && <p className="me-bio">{profile.bio}</p>}
+
+            {user && (
+              <div className="me-stats tabular-nums">
+                <span>
+                  <strong>{active.length}</strong>
+                  <small>Listings</small>
+                </span>
+                <span>
+                  <strong>{favourites.length}</strong>
+                  <small>Saved</small>
+                </span>
+                <span>
+                  <strong>{likedList.length}</strong>
+                  <small>Liked</small>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {user ? (
+            <>
+              <nav className="me-menu" aria-label="Account shortcuts">
+                <Link to="/dashboard" className="me-row">
+                  <span className="me-row-icon">
+                    <LayoutDashboard size={18} />
+                  </span>
+                  <div>
+                    <strong>Dashboard</strong>
+                    <small>Manage your listings and activity</small>
+                  </div>
+                  <ChevronRight size={16} />
+                </Link>
+                {user.id && (
+                  <Link to="/seller/$id" params={{ id: user.id }} className="me-row">
+                    <span className="me-row-icon">
+                      <StoreIcon size={18} />
+                    </span>
+                    <div>
+                      <strong>View my shop</strong>
+                      <small>See what buyers see and change your banner</small>
+                    </div>
+                    <ChevronRight size={16} />
+                  </Link>
+                )}
+                {user.role === "admin" && (
+                  <Link to="/admin" className="me-row">
+                    <span className="me-row-icon">
+                      <Shield size={18} />
+                    </span>
+                    <div>
+                      <strong>Admin Console</strong>
+                      <small>Review sellers and send announcements</small>
+                    </div>
+                    <ChevronRight size={16} />
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  className="me-row"
+                  onClick={() => {
+                    setAvatar(user.avatar);
+                    setEditing(true);
+                  }}
+                >
+                  <span className="me-row-icon">
+                    <Pencil size={18} />
+                  </span>
+                  <div>
+                    <strong>Edit profile</strong>
+                    <small>
+                      Contact: {profile?.contact}
+                      {profile?.contactDetails ? ` · ${profile.contactDetails}` : ""}
+                    </small>
+                  </div>
+                  <ChevronRight size={16} />
+                </button>
+              </nav>
+
+              <div className="me-menu me-menu-quiet">
+                <button type="button" className="me-row" onClick={() => void signOutUser()}>
+                  <span className="me-row-icon">
+                    <LogOut size={18} />
+                  </span>
+                  <div>
+                    <strong>Log out</strong>
+                  </div>
+                </button>
+                {user.role !== "admin" && (
+                  <button
+                    type="button"
+                    className="me-row me-row-danger"
                     onClick={() => {
                       setDeleteText("");
                       setDeleteOpen(true);
                     }}
                   >
-                    <Trash2 size={15} />
-                    Delete account
-                  </Button>
+                    <span className="me-row-icon">
+                      <Trash2 size={18} />
+                    </span>
+                    <div>
+                      <strong>Delete account</strong>
+                      <small>Permanently remove your data</small>
+                    </div>
+                  </button>
                 )}
-              </>
-            ) : (
-              <Button className="dashboard-create-btn" asChild>
-                <Link to="/auth">Verify &amp; Sell on CampusLoop</Link>
-              </Button>
-            )}
-          </div>
-        )}
-      </section>
+              </div>
+            </>
+          ) : (
+            <Button className="dashboard-create-btn me-cta" asChild>
+              <Link to="/auth">Verify &amp; Sell on CampusLoop</Link>
+            </Button>
+          )}
+        </section>
+      )}
 
       {sellerId && profile ? (
         <>
