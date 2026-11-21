@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import {
-  AlignLeft,
   BellRing,
   BookmarkCheck,
   CheckCircle2,
@@ -18,8 +17,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BRAND } from "@/lib/campus/data";
+import { SafariPageMenuIcon } from "./shared";
 import { useCampus } from "./store";
 
 type DeviceTab = "ios" | "android" | "desktop";
@@ -39,6 +44,8 @@ export function OnboardingPrompts() {
     dismissSellerPrompts,
     manualInstallOpen,
     closeInstallPrompt,
+    notifPromptOpen,
+    closeNotifPrompt,
     pushState,
     refreshPushState,
     requestAppNotifications,
@@ -49,7 +56,9 @@ export function OnboardingPrompts() {
   const [installing, setInstalling] = useState(false);
   const isPhoneDevice =
     typeof navigator !== "undefined" &&
-    /iPhone|iPod|Android.+Mobile|Mobile.+Android/i.test(navigator.userAgent || "");
+    /iPhone|iPod|Android.+Mobile|Mobile.+Android/i.test(
+      navigator.userAgent || "",
+    );
 
   useEffect(() => {
     if (isIOS) {
@@ -62,8 +71,10 @@ export function OnboardingPrompts() {
   }, [isIOS]);
 
   const showSellerNotif =
-    Boolean(user) && sellerPostAuthStage === "notifications" && pathname === "/dashboard";
-  const showNotifDialog = showSellerNotif;
+    Boolean(user) &&
+    sellerPostAuthStage === "notifications" &&
+    pathname === "/dashboard";
+  const showNotifDialog = showSellerNotif || notifPromptOpen;
 
   const showSellerInstall =
     Boolean(user) &&
@@ -71,7 +82,8 @@ export function OnboardingPrompts() {
     pathname === "/dashboard" &&
     !isStandalone;
 
-  const showBuyerInstall = buyerInstallOpen && pathname === "/discover" && !isStandalone;
+  const showBuyerInstall =
+    buyerInstallOpen && pathname === "/discover" && !isStandalone;
 
   const showInstallDialog = showNotifDialog
     ? false
@@ -84,6 +96,7 @@ export function OnboardingPrompts() {
   }
 
   function handleCloseNotif(enabled: boolean) {
+    if (notifPromptOpen) closeNotifPrompt();
     if (showSellerNotif) completeNotificationStep(enabled);
   }
 
@@ -209,7 +222,9 @@ export function OnboardingPrompts() {
                 <span className="perk-badge">
                   <CheckCircle2 size={15} />
                 </span>
-                <span>Instant messages &amp; campus updates on your lock screen</span>
+                <span>
+                  Instant messages &amp; campus updates on your lock screen
+                </span>
               </div>
               <div className="onboarding-perk-pill">
                 <span className="perk-badge">
@@ -220,10 +235,15 @@ export function OnboardingPrompts() {
             </div>
 
             <div className="onboarding-actions">
-              <Button className="onboarding-cta" onClick={handleEnableNotifications}>
+              <Button
+                className="onboarding-cta"
+                onClick={handleEnableNotifications}
+              >
                 <BellRing size={17} />
                 <span>
-                  {pushState === "blocked" ? "Check notification status" : "Turn on notifications"}
+                  {pushState === "blocked"
+                    ? "Check notification status"
+                    : "Turn on notifications"}
                 </span>
               </Button>
               <Button
@@ -298,10 +318,12 @@ export function OnboardingPrompts() {
             </div>
 
             <div className="onboarding-copy">
-              <DialogTitle className="onboarding-title">Install {BRAND}</DialogTitle>
+              <DialogTitle className="onboarding-title">
+                Install {BRAND}
+              </DialogTitle>
               <DialogDescription className="onboarding-desc">
-                Pin {BRAND} directly to your home screen for one-tap campus access and a smooth
-                full-screen app feel.
+                Pin {BRAND} directly to your home screen for one-tap campus
+                access and a smooth full-screen app feel.
               </DialogDescription>
             </div>
 
@@ -317,7 +339,11 @@ export function OnboardingPrompts() {
               </div>
             ) : (
               <>
-                <div className="device-switcher" role="tablist" aria-label="Device install guide">
+                <div
+                  className="device-switcher"
+                  role="tablist"
+                  aria-label="Device install guide"
+                >
                   <button
                     type="button"
                     role="tab"
@@ -356,20 +382,23 @@ export function OnboardingPrompts() {
                       <div className="install-step">
                         <span className="step-num">1</span>
                         <p>
-                          Tap <AlignLeft size={14} className="inline-icon" /> in your Safari toolbar
+                          Tap <SafariPageMenuIcon className="inline-icon" /> in
+                          your Safari toolbar
                         </p>
                       </div>
                       <div className="install-step">
                         <span className="step-num">2</span>
                         <p>
-                          Tap <Share size={14} className="inline-icon" /> <strong>Share</strong>
+                          Tap <Share size={14} className="inline-icon" />{" "}
+                          <strong>Share</strong>
                         </p>
                       </div>
                       <div className="install-step">
                         <span className="step-num">3</span>
                         <p>
                           Pick <PlusSquare size={14} className="inline-icon" />{" "}
-                          <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
+                          <strong>Add to Home Screen</strong>, then tap{" "}
+                          <strong>Add</strong>
                         </p>
                       </div>
                     </>
@@ -378,13 +407,15 @@ export function OnboardingPrompts() {
                       <div className="install-step">
                         <span className="step-num">1</span>
                         <p>
-                          Open your browser menu (<strong>⋮</strong>) in Chrome or Edge
+                          Open your browser menu (<strong>⋮</strong>) in Chrome
+                          or Edge
                         </p>
                       </div>
                       <div className="install-step">
                         <span className="step-num">2</span>
                         <p>
-                          Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>
+                          Tap <strong>Install app</strong> or{" "}
+                          <strong>Add to Home screen</strong>
                         </p>
                       </div>
                     </>
@@ -403,11 +434,13 @@ export function OnboardingPrompts() {
                         <p>
                           {isMacSafari ? (
                             <>
-                              Select <strong>Add to Dock</strong> to launch {BRAND} like an app
+                              Select <strong>Add to Dock</strong> to launch{" "}
+                              {BRAND} like an app
                             </>
                           ) : (
                             <>
-                              Confirm <strong>Install {BRAND}</strong> to pin it to your desktop
+                              Confirm <strong>Install {BRAND}</strong> to pin it
+                              to your desktop
                             </>
                           )}
                         </p>
@@ -419,7 +452,11 @@ export function OnboardingPrompts() {
             )}
 
             <div className="onboarding-actions">
-              <Button className="onboarding-cta" onClick={handleInstallClick} disabled={installing}>
+              <Button
+                className="onboarding-cta"
+                onClick={handleInstallClick}
+                disabled={installing}
+              >
                 <Download size={17} />
                 <span>
                   {canNativeInstall
@@ -432,7 +469,11 @@ export function OnboardingPrompts() {
                 </span>
               </Button>
               {!canNativeInstall && !isPhoneDevice ? (
-                <Button variant="ghost" className="onboarding-skip" onClick={handleCloseInstall}>
+                <Button
+                  variant="ghost"
+                  className="onboarding-skip"
+                  onClick={handleCloseInstall}
+                >
                   Continue in browser
                 </Button>
               ) : null}
@@ -471,7 +512,8 @@ export function OfflineBanner() {
 
 const BOT_PATTERN =
   /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|preview|lighthouse/i;
-const IN_APP_BROWSER_PATTERN = /FBAN|FBAV|Instagram|Snapchat|TikTok|Line\/|MicroMessenger|; wv\)/i;
+const IN_APP_BROWSER_PATTERN =
+  /FBAN|FBAV|Instagram|Snapchat|TikTok|Line\/|MicroMessenger|; wv\)/i;
 
 /**
  * Phones only: if the site is opened in a normal browser tab (not from the
@@ -480,7 +522,8 @@ const IN_APP_BROWSER_PATTERN = /FBAN|FBAV|Instagram|Snapchat|TikTok|Line\/|Micro
  * admin area are never blocked.
  */
 export function InstallGate() {
-  const { isIOS, canNativeInstall, triggerNativeInstall, user, authLoading } = useCampus();
+  const { isIOS, canNativeInstall, triggerNativeInstall, user, authLoading } =
+    useCampus();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [blocked, setBlocked] = useState(false);
   const [inAppBrowser, setInAppBrowser] = useState(false);
@@ -499,7 +542,8 @@ export function InstallGate() {
     setInAppBrowser(IN_APP_BROWSER_PATTERN.test(ua));
     setBlocked(isPhone && !standalone && !BOT_PATTERN.test(ua));
 
-    const searchAndHash = `${window.location.search}${window.location.hash}`.toLowerCase();
+    const searchAndHash =
+      `${window.location.search}${window.location.hash}`.toLowerCase();
     if (
       searchAndHash.includes("verified=1") ||
       searchAndHash.includes("type=signup") ||
@@ -542,7 +586,10 @@ export function InstallGate() {
       </div>
 
       <div className="surface-panel curve-accent install-gate-card">
-        <div className="onboarding-stage install-stage install-gate-stage" aria-hidden="true">
+        <div
+          className="onboarding-stage install-stage install-gate-stage"
+          aria-hidden="true"
+        >
           <span className="stage-orb stage-orb-a" />
           <span className="stage-orb stage-orb-c" />
           <svg
@@ -595,7 +642,10 @@ export function InstallGate() {
 
         {verifiedEmailFlow && (
           <div className="install-gate-verified" role="status">
-            <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2
+              size={18}
+              className="shrink-0 text-emerald-600 dark:text-emerald-400"
+            />
             <div>
               <strong>
                 {!authLoading && user
@@ -603,8 +653,9 @@ export function InstallGate() {
                   : "Email confirmation detected"}
               </strong>
               <span>
-                Open <strong>{BRAND}</strong> from your Home Screen icon to continue inside the app
-                — or follow the steps below if you haven&apos;t added it yet.
+                Open <strong>{BRAND}</strong> from your Home Screen icon to
+                continue inside the app — or follow the steps below if you
+                haven&apos;t added it yet.
               </span>
             </div>
           </div>
@@ -613,8 +664,8 @@ export function InstallGate() {
         <div className="install-gate-copy">
           <h1>Install {BRAND} to continue</h1>
           <p>
-            {BRAND} runs as a fast full-screen app on your phone. Add it to your Home Screen in 10
-            seconds, then launch from its icon.
+            {BRAND} runs as a fast full-screen app on your phone. Add it to your
+            Home Screen in 10 seconds, then launch from its icon.
           </p>
         </div>
 
@@ -624,8 +675,9 @@ export function InstallGate() {
               <span className="step-num">1</span>
               <p>
                 You are inside another app&apos;s browser. Tap{" "}
-                <MoreHorizontal size={15} className="inline-icon" /> <strong>•••</strong> or the
-                Share menu and choose <strong>Open in {isIOS ? "Safari" : "Chrome"}</strong>.
+                <MoreHorizontal size={15} className="inline-icon" />{" "}
+                <strong>•••</strong> or the Share menu and choose{" "}
+                <strong>Open in {isIOS ? "Safari" : "Chrome"}</strong>.
               </p>
             </div>
             <div className="install-step">
@@ -633,14 +685,16 @@ export function InstallGate() {
               <p>
                 {isIOS ? (
                   <>
-                    Tap <AlignLeft size={14} className="inline-icon" /> in Safari, tap{" "}
-                    <Share size={14} className="inline-icon" /> <strong>Share</strong>, then choose{" "}
+                    Tap <SafariPageMenuIcon className="inline-icon" /> in
+                    Safari, tap <Share size={14} className="inline-icon" />{" "}
+                    <strong>Share</strong>, then choose{" "}
                     <PlusSquare size={14} className="inline-icon" />{" "}
                     <strong>Add to Home Screen</strong>.
                   </>
                 ) : (
                   <>
-                    Then tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                    Then tap <strong>Install app</strong> or{" "}
+                    <strong>Add to Home screen</strong>.
                   </>
                 )}
               </p>
@@ -651,20 +705,23 @@ export function InstallGate() {
             <div className="install-step">
               <span className="step-num">1</span>
               <p>
-                Tap <AlignLeft size={14} className="inline-icon" /> in your Safari toolbar
+                Tap <SafariPageMenuIcon className="inline-icon" /> in your
+                Safari toolbar
               </p>
             </div>
             <div className="install-step">
               <span className="step-num">2</span>
               <p>
-                Tap <Share size={14} className="inline-icon" /> <strong>Share</strong>
+                Tap <Share size={14} className="inline-icon" />{" "}
+                <strong>Share</strong>
               </p>
             </div>
             <div className="install-step">
               <span className="step-num">3</span>
               <p>
                 Click <PlusSquare size={14} className="inline-icon" />{" "}
-                <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>
+                <strong>Add to Home Screen</strong>, then tap{" "}
+                <strong>Add</strong>
               </p>
             </div>
             <div className="install-step">
@@ -683,20 +740,24 @@ export function InstallGate() {
                 disabled={installing}
               >
                 <Download size={17} />
-                <span>{installing ? "Opening installer..." : "Add to Home Screen"}</span>
+                <span>
+                  {installing ? "Opening installer..." : "Add to Home Screen"}
+                </span>
               </Button>
             ) : (
               <div className="install-steps-box w-full text-left install-gate-steps">
                 <div className="install-step">
                   <span className="step-num">1</span>
                   <p>
-                    Open your browser menu (<strong>⋮</strong>) in Chrome or Edge
+                    Open your browser menu (<strong>⋮</strong>) in Chrome or
+                    Edge
                   </p>
                 </div>
                 <div className="install-step">
                   <span className="step-num">2</span>
                   <p>
-                    Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>
+                    Tap <strong>Install app</strong> or{" "}
+                    <strong>Add to Home screen</strong>
                   </p>
                 </div>
                 <div className="install-step">
@@ -711,7 +772,8 @@ export function InstallGate() {
         )}
 
         <p className="install-gate-footnote">
-          Already installed? Open <strong>{BRAND}</strong> from its icon on your Home Screen.
+          Already installed? Open <strong>{BRAND}</strong> from its icon on your
+          Home Screen.
         </p>
       </div>
     </div>
