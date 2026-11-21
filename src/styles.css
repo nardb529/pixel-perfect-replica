@@ -7553,3 +7553,122 @@ html.dark .plan-card {
     display: none;
   }
 }
+
+
+/* Notification bell + persistent prompt (restored) */
+.header-notif-btn.needs-attention {
+  border-color: color-mix(in oklch, var(--primary) 52%, var(--border));
+  background: color-mix(in oklch, var(--primary) 12%, var(--surface-tint));
+  color: var(--primary);
+}
+
+.header-notif-btn.needs-attention svg {
+  animation: bellSwing 3.4s ease-in-out infinite;
+}
+
+.header-notif-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--destructive);
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 0 oklch(0.58 0.22 25 / 0.5);
+  animation: liveDotPulse 2s ease-out infinite;
+}
+
+.notif-persistent-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 20px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--primary) 13%, var(--card)),
+    color-mix(in oklch, var(--violet) 11%, var(--card))
+  );
+  border: 1px solid color-mix(in oklch, var(--primary) 34%, var(--border));
+  box-shadow: var(--shadow-card);
+  animation: fadeUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.notif-persistent-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--violet));
+  color: var(--primary-foreground);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px oklch(0.565 0.22 269 / 0.28);
+}
+
+.notif-persistent-icon svg {
+  animation: bellSwing 3.2s ease-in-out infinite;
+}
+
+.notif-persistent-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-persistent-copy strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--foreground);
+  line-height: 1.25;
+}
+
+.notif-persistent-copy span {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  line-height: 1.35;
+}
+
+.notif-persistent-btn {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 0;
+  background: linear-gradient(135deg, var(--primary), var(--violet));
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 6px 16px oklch(0.565 0.22 269 / 0.28);
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+
+.notif-persistent-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 10px 22px oklch(0.565 0.22 269 / 0.36);
+}
+
+.safari-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--foreground) 14%, var(--muted));
+  color: var(--foreground);
+  border: 1px solid color-mix(in oklch, var(--border) 90%, transparent);
+  margin: 0 2px;
+}
+
+.dark .safari-menu-badge {
+  background: color-mix(in oklch, #fff 16%, var(--muted));
+  color: #fff;
+}
