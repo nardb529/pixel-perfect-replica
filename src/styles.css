@@ -7700,3 +7700,14 @@ html.dark .plan-card {
 .header-notif-dot {
   animation: notifDotPulse 2s ease-out infinite;
 }
+
+/* Launch splash: always paint to the very bottom of the screen (iOS home-indicator area) */
+.launch-splash {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: calc(-1 * (env(safe-area-inset-bottom, 0px) + 64px));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+  min-height: 100lvh;
+  box-sizing: border-box;
+}
