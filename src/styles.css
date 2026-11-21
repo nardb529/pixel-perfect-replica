@@ -7686,3 +7686,17 @@ html.dark .plan-card {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Bell alert dot: red ring (no green) */
+@keyframes notifDotPulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(0.58 0.22 25 / 0.5);
+  }
+  75%,
+  100% {
+    box-shadow: 0 0 0 7px oklch(0.58 0.22 25 / 0);
+  }
+}
+.header-notif-dot {
+  animation: notifDotPulse 2s ease-out infinite;
+}
