@@ -35,7 +35,7 @@ function Welcome() {
   return (
     <div className="wel-screen">
       <div className="wel-photo">
-        <img src="/banners/welcome.jpg" alt="" aria-hidden="true" fetchPriority="high" />
+        <img src="/banners/welcome.jpg" alt="CampusLoop students buying and selling on campus" fetchPriority="high" />
         <div className="wel-photo-shade" aria-hidden="true" />
         <div className="wel-topbar">
           <span className="wel-logo">
