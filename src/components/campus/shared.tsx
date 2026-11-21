@@ -8,7 +8,12 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import {
+  Link,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -22,6 +27,8 @@ import {
   UserRound,
   Bookmark,
   Search,
+  Bell,
+  BellRing,
   Heart,
   X,
   LayoutDashboard,
@@ -39,8 +46,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useCampus } from "./store";
 import { hasSeenImage, markImageSeen } from "@/lib/campus/imageCache";
 import {
@@ -52,7 +68,13 @@ import {
   type Listing,
 } from "@/lib/campus/data";
 
-export function BrandMark({ size = 34, animated = false }: { size?: number; animated?: boolean }) {
+export function BrandMark({
+  size = 34,
+  animated = false,
+}: {
+  size?: number;
+  animated?: boolean;
+}) {
   return (
     <svg
       width={size}
@@ -71,8 +93,82 @@ export function BrandMark({ size = 34, animated = false }: { size?: number; anim
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle className="brand-loop-node" cx="41.5" cy="32" r="2.8" fill="#FFFFFF" />
+      <circle
+        className="brand-loop-node"
+        cx="41.5"
+        cy="32"
+        r="2.8"
+        fill="#FFFFFF"
+      />
     </svg>
+  );
+}
+
+export function SafariPageMenuIcon({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`safari-menu-badge ${className}`.trim()}
+      aria-label="Safari Page Menu icon"
+    >
+      <svg
+        width="16"
+        height="12"
+        viewBox="0 0 18 14"
+        fill="none"
+        aria-hidden="true"
+      >
+        <line
+          x1="2"
+          y1="2.5"
+          x2="16"
+          y2="2.5"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="2"
+          y1="7"
+          x2="16"
+          y2="7"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+        <line
+          x1="2"
+          y1="11.5"
+          x2="11"
+          y2="11.5"
+          stroke="currentColor"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+export function HeroBannerBackdrop({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !isSafeMediaUrl(src)) {
+    return null;
+  }
+
+  return (
+    <div className="hero-banner-media" aria-hidden="true">
+      <img
+        src={src}
+        alt={alt}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+      />
+      <span className="hero-banner-scrim" />
+    </div>
   );
 }
 
@@ -194,7 +290,11 @@ export function AnimatedSelect({
               />
             )}
             <span className="ui-dropdown-label">{displayLabel}</span>
-            <ChevronDown size={14} className="ui-dropdown-chevron" aria-hidden="true" />
+            <ChevronDown
+              size={14}
+              className="ui-dropdown-chevron"
+              aria-hidden="true"
+            />
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -204,7 +304,11 @@ export function AnimatedSelect({
           aria-label={ariaLabel || kicker || "Options"}
         >
           {kicker && <span className="ui-dropdown-kicker">{kicker}</span>}
-          <div className="ui-dropdown-list" role="listbox" aria-label={ariaLabel || kicker}>
+          <div
+            className="ui-dropdown-list"
+            role="listbox"
+            aria-label={ariaLabel || kicker}
+          >
             {normalized.map((opt, idx) => {
               const active = opt.value === currentValue;
               return (
@@ -218,7 +322,10 @@ export function AnimatedSelect({
                   onClick={() => choose(opt.value)}
                 >
                   {opt.tone && (
-                    <span className={`ui-dropdown-tone-dot tone-${opt.tone}`} aria-hidden="true" />
+                    <span
+                      className={`ui-dropdown-tone-dot tone-${opt.tone}`}
+                      aria-hidden="true"
+                    />
                   )}
                   <span className="ui-dropdown-option-text">
                     <strong>{opt.label}</strong>
@@ -283,13 +390,16 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Light mode" : "Dark mode"}
     >
-      <span className="theme-toggle-icon">{isDark ? <Sun size={17} /> : <Moon size={17} />}</span>
+      <span className="theme-toggle-icon">
+        {isDark ? <Sun size={17} /> : <Moon size={17} />}
+      </span>
     </button>
   );
 }
 
 export function UniversitySelect({ compact = false }: { compact?: boolean }) {
-  const { university, setUniversity, myUniversity, universityNames } = useCampus();
+  const { university, setUniversity, myUniversity, universityNames } =
+    useCampus();
   const [open, setOpen] = useState(false);
 
   const label = university === "All Universities" ? "All Campuses" : university;
@@ -313,7 +423,11 @@ export function UniversitySelect({ compact = false }: { compact?: boolean }) {
             <MapPin size={13} strokeWidth={2.25} />
           </span>
           <span className="uni-trigger-label">{label}</span>
-          <ChevronDown size={13} className="uni-trigger-chevron" aria-hidden="true" />
+          <ChevronDown
+            size={13}
+            className="uni-trigger-chevron"
+            aria-hidden="true"
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -408,13 +522,27 @@ export function Shell({ children }: { children: ReactNode }) {
 }
 
 function ShellFrame({ children }: { children: ReactNode }) {
-  const { user, saved } = useCampus();
+  const {
+    user,
+    saved,
+    pushState,
+    pushChecked,
+    unreadNotificationCount,
+    openNotifPrompt,
+    requestAppNotifications,
+    openInstallPrompt,
+    isStandalone,
+  } = useCampus();
   const navigate = useNavigate();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof router.preloadRoute !== "function") return;
+    if (
+      typeof window === "undefined" ||
+      typeof router.preloadRoute !== "function"
+    )
+      return;
     const warmRoutes = () => {
       const targets = [
         "/discover",
@@ -430,7 +558,10 @@ function ShellFrame({ children }: { children: ReactNode }) {
       }
     };
     const w = window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number },
+      ) => number;
       cancelIdleCallback?: (id: number) => void;
     };
     if (w.requestIdleCallback) {
@@ -457,6 +588,29 @@ function ShellFrame({ children }: { children: ReactNode }) {
     { to: "/profile" as const, label: "Profile", icon: UserRound },
   ];
 
+  function handleHeaderNotifClick() {
+    if (pushState === "on") {
+      if (user) {
+        void navigate({ to: "/dashboard" });
+      } else {
+        toast.success("Notifications are active on this device");
+      }
+      return;
+    }
+    openNotifPrompt();
+  }
+
+  async function handleQuickEnablePush() {
+    const result = await requestAppNotifications();
+    if (result === "granted") {
+      toast.success("Notifications turned on for this device");
+    } else if (result === "denied") {
+      openNotifPrompt();
+    } else if (result === "unsupported") {
+      openNotifPrompt();
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header-wrap">
@@ -478,14 +632,19 @@ function ShellFrame({ children }: { children: ReactNode }) {
               {user && (
                 <Link
                   to="/dashboard"
-                  className={path === "/dashboard" ? "nav-link active" : "nav-link"}
+                  className={
+                    path === "/dashboard" ? "nav-link active" : "nav-link"
+                  }
                 >
                   <LayoutDashboard size={15} />
                   <span>Dashboard</span>
                 </Link>
               )}
               {user?.role === "admin" && (
-                <Link to="/admin" className={path === "/admin" ? "nav-link active" : "nav-link"}>
+                <Link
+                  to="/admin"
+                  className={path === "/admin" ? "nav-link active" : "nav-link"}
+                >
                   <Shield size={15} />
                   <span>Admin</span>
                 </Link>
@@ -495,6 +654,37 @@ function ShellFrame({ children }: { children: ReactNode }) {
             <div className="header-actions">
               <UniversitySelect />
               <ThemeToggle compact />
+              <button
+                type="button"
+                onClick={handleHeaderNotifClick}
+                className={`header-icon-btn header-notif-btn ${
+                  pushChecked && pushState !== "on" ? "needs-attention" : ""
+                }`}
+                title={
+                  pushState === "on"
+                    ? unreadNotificationCount > 0
+                      ? `Notifications · ${unreadNotificationCount} unread`
+                      : "Notifications are on"
+                    : "Turn on your notifications"
+                }
+                aria-label={
+                  pushState === "on"
+                    ? "Notifications"
+                    : "Turn on your notifications"
+                }
+              >
+                {pushChecked && pushState !== "on" ? (
+                  <BellRing size={17} />
+                ) : (
+                  <Bell size={17} />
+                )}
+                {pushState === "on" && unreadNotificationCount > 0 && (
+                  <span className="save-count">{unreadNotificationCount}</span>
+                )}
+                {pushChecked && pushState !== "on" && (
+                  <span className="header-notif-dot" aria-hidden="true" />
+                )}
+              </button>
               {user?.role === "admin" && (
                 <Link
                   to="/admin"
@@ -515,18 +705,72 @@ function ShellFrame({ children }: { children: ReactNode }) {
               <Link
                 to="/profile"
                 className="header-icon-btn header-profile-btn"
-                title={saved.length > 0 ? `Profile · ${saved.length} saved` : "Your profile"}
+                title={
+                  saved.length > 0
+                    ? `Profile · ${saved.length} saved`
+                    : "Your profile"
+                }
                 aria-label="Your profile"
               >
                 <UserRound size={17} />
-                {saved.length > 0 && <span className="save-count">{saved.length}</span>}
+                {saved.length > 0 && (
+                  <span className="save-count">{saved.length}</span>
+                )}
               </Link>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="market-main">{children}</main>
+      <main className="market-main">
+        {pushChecked && pushState !== "on" && (
+          <div
+            className="notif-persistent-bar"
+            role="region"
+            aria-label="Turn on notifications"
+          >
+            <span className="notif-persistent-icon" aria-hidden="true">
+              <BellRing size={16} />
+            </span>
+            <div className="notif-persistent-copy">
+              <strong>
+                {pushState === "blocked"
+                  ? "Notifications are blocked in device settings"
+                  : pushState === "unsupported" && !isStandalone
+                    ? "Add CampusLoop to Home Screen for alerts"
+                    : "Turn on your notifications"}
+              </strong>
+              <span>
+                {pushState === "blocked"
+                  ? "Allow CampusLoop notifications in site settings so updates reach your phone."
+                  : pushState === "unsupported" && !isStandalone
+                    ? "Open from your Home Screen icon to turn on phone notifications."
+                    : "Get CampusLoop messages and updates on your device even when closed."}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="notif-persistent-btn"
+              onClick={() => {
+                if (pushState === "off") {
+                  void handleQuickEnablePush();
+                } else if (pushState === "unsupported" && !isStandalone) {
+                  openInstallPrompt();
+                } else {
+                  openNotifPrompt();
+                }
+              }}
+            >
+              {pushState === "blocked"
+                ? "Fix"
+                : pushState === "unsupported" && !isStandalone
+                  ? "Install app"
+                  : "Turn on"}
+            </button>
+          </div>
+        )}
+        {children}
+      </main>
 
       <footer className="market-footer-wrap">
         <div className="market-footer surface-panel">
@@ -558,7 +802,9 @@ function ShellFrame({ children }: { children: ReactNode }) {
                 <span className="dock-icon-wrap">
                   <n.icon size={23} strokeWidth={active ? 2.85 : 2.35} />
                 </span>
-                {active && <span className="dock-active-dot" aria-hidden="true" />}
+                {active && (
+                  <span className="dock-active-dot" aria-hidden="true" />
+                )}
               </Link>
             );
           })}
@@ -589,9 +835,13 @@ function ShellFrame({ children }: { children: ReactNode }) {
               >
                 <span className="dock-icon-wrap">
                   <n.icon size={23} strokeWidth={active ? 2.85 : 2.35} />
-                  {showSavedDot && <span className="dock-badge" aria-hidden="true" />}
+                  {showSavedDot && (
+                    <span className="dock-badge" aria-hidden="true" />
+                  )}
                 </span>
-                {active && <span className="dock-active-dot" aria-hidden="true" />}
+                {active && (
+                  <span className="dock-active-dot" aria-hidden="true" />
+                )}
               </Link>
             );
           })}
@@ -606,7 +856,14 @@ export function PageBackButton({
   label = "Back",
   className = "",
 }: {
-  fallbackTo?: "/discover" | "/products" | "/services" | "/profile" | "/dashboard" | "/auth" | "/";
+  fallbackTo?:
+    | "/discover"
+    | "/products"
+    | "/services"
+    | "/profile"
+    | "/dashboard"
+    | "/auth"
+    | "/";
   label?: string;
   className?: string;
 }) {
@@ -615,7 +872,8 @@ export function PageBackButton({
 
   function handleBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
-      const historyApi = (router as { history?: { back?: () => void } }).history;
+      const historyApi = (router as { history?: { back?: () => void } })
+        .history;
       if (typeof historyApi?.back === "function") {
         historyApi.back();
         return;
@@ -639,14 +897,26 @@ export function PageBackButton({
   );
 }
 
-export function ListingCard({ listing, compact = false }: { listing: Listing; compact?: boolean }) {
+export function ListingCard({
+  listing,
+  compact = false,
+  priority = false,
+}: {
+  listing: Listing;
+  compact?: boolean;
+  priority?: boolean;
+}) {
   const { saved, toggleSave, recordContact } = useCampus();
   const [imgFailed, setImgFailed] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const isSaved = saved.includes(listing.id);
   const hasPrice = listing.type === "product" || listing.price > 0;
   const isService = listing.type === "service";
-  const metaTag = isService ? "Service" : listing.condition === "New" ? "New" : listing.condition;
+  const metaTag = isService
+    ? "Service"
+    : listing.condition === "New"
+      ? "New"
+      : listing.condition;
   const enquiryText = `Hi ${listing.seller}, I saw “${listing.title}” on CampusLoop. Is it still available?`;
   const whatsappUrl = buildWhatsAppUrl(listing.contact, enquiryText);
   const phoneHref = buildPhoneHref(listing.contact);
@@ -661,14 +931,21 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
 
   return (
     <>
-      <article className={`listing-card ${compact ? "compact" : ""} ${wasSeen ? "is-seen" : ""}`}>
+      <article
+        className={`listing-card ${compact ? "compact" : ""} ${wasSeen ? "is-seen" : ""}`}
+      >
         <div className="listing-image">
-          <Link to="/listing/$id" params={{ id: listing.id }} aria-label={`View ${listing.title}`}>
+          <Link
+            to="/listing/$id"
+            params={{ id: listing.id }}
+            aria-label={`View ${listing.title}`}
+          >
             {!imgFailed && safeImage ? (
               <img
                 src={safeImage}
                 alt={listing.title}
-                loading={wasSeen ? "eager" : "lazy"}
+                loading={wasSeen || priority ? "eager" : "lazy"}
+                fetchPriority={priority ? "high" : undefined}
                 decoding="async"
                 referrerPolicy="no-referrer"
                 width={1024}
@@ -678,7 +955,11 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
               />
             ) : (
               <div className="listing-image-fallback">
-                {isService ? <Briefcase size={24} /> : <ShoppingBag size={24} />}
+                {isService ? (
+                  <Briefcase size={24} />
+                ) : (
+                  <ShoppingBag size={24} />
+                )}
                 <span>{listing.category}</span>
               </div>
             )}
@@ -703,7 +984,9 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
           </Link>
           {isService && <p className="listing-desc">{listing.description}</p>}
           <p className={`listing-price ${!hasPrice ? "on-request" : ""}`}>
-            {isService && hasPrice && listing.priceType !== "Free" && <small>From </small>}
+            {isService && hasPrice && listing.priceType !== "Free" && (
+              <small>From </small>
+            )}
             {formatListingPrice(listing)}
             {isService && <ArrowUpRight size={15} />}
           </p>
@@ -726,7 +1009,11 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
             >
               <span>{listing.seller}</span>
               {listing.verificationStatus === "verified" && (
-                <BadgeCheck size={12} aria-label="Verified seller" className="text-primary" />
+                <BadgeCheck
+                  size={12}
+                  aria-label="Verified seller"
+                  className="text-primary"
+                />
               )}
             </Link>
             <span>{listing.time}</span>
@@ -768,7 +1055,11 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                   <img src={safeImage} alt={listing.title} />
                 ) : (
                   <span className="quick-listing-thumb-fallback">
-                    {isService ? <Briefcase size={18} /> : <ShoppingBag size={18} />}
+                    {isService ? (
+                      <Briefcase size={18} />
+                    ) : (
+                      <ShoppingBag size={18} />
+                    )}
                   </span>
                 )}
                 <div className="quick-listing-meta">
@@ -784,7 +1075,9 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                 <MessageCircle size={20} />
                 <div>
                   <strong>{listing.contactMethod || "WhatsApp"}</strong>
-                  <small>{listing.contact || "Contact available via seller"}</small>
+                  <small>
+                    {listing.contact || "Contact available via seller"}
+                  </small>
                 </div>
                 <Check className="ml-auto" size={16} />
               </div>
@@ -808,7 +1101,9 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => {
-                        toast.success(`Opening WhatsApp chat with ${listing.seller}`);
+                        toast.success(
+                          `Opening WhatsApp chat with ${listing.seller}`,
+                        );
                         setQuickOpen(false);
                       }}
                     >
@@ -822,9 +1117,13 @@ export function ListingCard({ listing, compact = false }: { listing: Listing; co
                     onClick={async () => {
                       try {
                         await navigator.clipboard.writeText(enquiryText);
-                        toast.success("Enquiry copied — reach out via seller contact");
+                        toast.success(
+                          "Enquiry copied — reach out via seller contact",
+                        );
                       } catch {
-                        toast.error("Copy failed — reach out using the contact details above");
+                        toast.error(
+                          "Copy failed — reach out using the contact details above",
+                        );
                       }
                       setQuickOpen(false);
                     }}
@@ -878,8 +1177,14 @@ export function SearchBar({
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  suggestions?: Array<{ id: string; title: string; type: "product" | "service" }>;
-  onSelectSuggestion?: ((item: { id: string; title: string }) => void) | undefined;
+  suggestions?: Array<{
+    id: string;
+    title: string;
+    type: "product" | "service";
+  }>;
+  onSelectSuggestion?:
+    | ((item: { id: string; title: string }) => void)
+    | undefined;
 }) {
   const [focused, setFocused] = useState(false);
   const blurTimerRef = useRef<number | undefined>(undefined);
@@ -907,7 +1212,10 @@ export function SearchBar({
             setFocused(true);
           }}
           onBlur={() => {
-            blurTimerRef.current = window.setTimeout(() => setFocused(false), 140);
+            blurTimerRef.current = window.setTimeout(
+              () => setFocused(false),
+              140,
+            );
           }}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -1040,7 +1348,10 @@ export function SaveButton({ id }: { id: string }) {
   const { saved, toggleSave } = useCampus();
   const isSaved = saved.includes(id);
   return (
-    <Button variant={isSaved ? "secondary" : "outline"} onClick={() => toggleSave(id)}>
+    <Button
+      variant={isSaved ? "secondary" : "outline"}
+      onClick={() => toggleSave(id)}
+    >
       <Bookmark size={16} fill={isSaved ? "currentColor" : "none"} />
       {isSaved ? "Saved" : "Save"}
     </Button>
