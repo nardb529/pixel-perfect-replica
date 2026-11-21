@@ -143,9 +143,9 @@ export function InstallGate() {
           height={84}
           style={{ borderRadius: 22, boxShadow: "0 12px 30px rgba(30,50,120,0.25)" }}
         />
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>
+        <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>
           Install {BRAND} to continue
-        </h1>
+        </h2>
         <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.75 }}>
           {BRAND} runs as a fast full-screen app on your phone. Add it to your Home Screen, then
           open it from the icon. It is free and takes 10 seconds.
