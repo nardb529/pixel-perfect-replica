@@ -25,7 +25,9 @@ function NotFoundComponent() {
     <div className="error-boundary-shell">
       <div className="surface-panel error-boundary-card">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">
+          Page not found
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
@@ -52,10 +54,12 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <div className="error-boundary-shell">
       <div className="surface-panel error-boundary-card">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Technical issue</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          Technical issue
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          We&apos;re experiencing a brief technical issue, and it is being worked on. You can try
-          refreshing or head back home.
+          We&apos;re experiencing a brief technical issue, and it is being
+          worked on. You can try refreshing or head back home.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -80,91 +84,117 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "CampusLoop — Ghana University Campus Marketplace" },
-      {
-        name: "description",
-        content:
-          "CampusLoop is the Ghana university campus marketplace for student products, verified services, books, electronics, and hostelling essentials. Buyers need no account.",
-      },
-      {
-        name: "keywords",
-        content:
-          "CampusLoop, Ghana university marketplace, KNUST buy and sell, University of Ghana Legon market, UCC campus market, UPSA market, student electronics Ghana, Ghana campus services",
-      },
-      { name: "author", content: "CampusLoop" },
-      { name: "application-name", content: "CampusLoop" },
-      { name: "robots", content: "index, follow, max-image-preview:large" },
-      { name: "theme-color", content: "#4965F5" },
-      { name: "mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "CampusLoop" },
-      { property: "og:site_name", content: "CampusLoop Marketplace" },
-      { property: "og:locale", content: "en_GH" },
-      { property: "og:title", content: "CampusLoop — Ghana University Campus Marketplace" },
-      {
-        property: "og:description",
-        content:
-          "Buy and sell student products and verified services across KNUST, UG, UCC, UDS, UENR, and Ghanaian campuses. Buyers shop freely without an account.",
-      },
-      { property: "og:type", content: "website" },
-      {
-        property: "og:image",
-        content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
-      },
-      { property: "og:url", content: DEFAULT_SITE_URL },
-      { property: "og:image:secure_url", content: `${DEFAULT_SITE_URL}/og-marketplace.jpg` },
-      { property: "og:image:type", content: "image/jpeg" },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      {
-        property: "og:image:alt",
-        content: "CampusLoop Marketplace screenshot showing Ghana campus products and services",
-      },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "CampusLoop — Ghana University Campus Marketplace" },
-      {
-        name: "twitter:description",
-        content:
-          "Buy and sell student products and verified services across Ghanaian university campuses. No buyer account needed.",
-      },
-      {
-        name: "twitter:image",
-        content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
-      },
-    ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-      {
-        rel: "alternate",
-        type: "text/plain",
-        title: "CampusLoop AI & LLM Marketplace Guide",
-        href: "/llms.txt",
-      },
-    ],
-  }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-  errorComponent: ErrorComponent,
-});
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    head: () => ({
+      meta: [
+        { charSet: "utf-8" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        },
+        { title: "CampusLoop — Ghana University Campus Marketplace" },
+        {
+          name: "description",
+          content:
+            "CampusLoop is the Ghana university campus marketplace for student products, verified services, books, electronics, and hostelling essentials. Buyers need no account.",
+        },
+        {
+          name: "keywords",
+          content:
+            "CampusLoop, Ghana university marketplace, KNUST buy and sell, University of Ghana Legon market, UCC campus market, UPSA market, student electronics Ghana, Ghana campus services",
+        },
+        { name: "author", content: "CampusLoop" },
+        { name: "application-name", content: "CampusLoop" },
+        { name: "robots", content: "index, follow, max-image-preview:large" },
+        { name: "theme-color", content: "#4965F5" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        {
+          name: "apple-mobile-web-app-status-bar-style",
+          content: "black-translucent",
+        },
+        { name: "apple-mobile-web-app-title", content: "CampusLoop" },
+        { property: "og:site_name", content: "CampusLoop Marketplace" },
+        { property: "og:locale", content: "en_GH" },
+        {
+          property: "og:title",
+          content: "CampusLoop — Ghana University Campus Marketplace",
+        },
+        {
+          property: "og:description",
+          content:
+            "Buy and sell student products and verified services across KNUST, UG, UCC, UDS, UENR, and Ghanaian campuses. Buyers shop freely without an account.",
+        },
+        { property: "og:type", content: "website" },
+        {
+          property: "og:image",
+          content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
+        },
+        { property: "og:url", content: DEFAULT_SITE_URL },
+        {
+          property: "og:image:secure_url",
+          content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
+        },
+        { property: "og:image:type", content: "image/jpeg" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        {
+          property: "og:image:alt",
+          content:
+            "CampusLoop Marketplace screenshot showing Ghana campus products and services",
+        },
+        { name: "twitter:card", content: "summary_large_image" },
+        {
+          name: "twitter:title",
+          content: "CampusLoop — Ghana University Campus Marketplace",
+        },
+        {
+          name: "twitter:description",
+          content:
+            "Buy and sell student products and verified services across Ghanaian university campuses. No buyer account needed.",
+        },
+        {
+          name: "twitter:image",
+          content: `${DEFAULT_SITE_URL}/og-marketplace.jpg`,
+        },
+      ],
+      links: [
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
+        },
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+        { rel: "manifest", href: "/manifest.webmanifest" },
+        { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        {
+          rel: "apple-touch-icon",
+          href: "/apple-touch-icon.png",
+          sizes: "180x180",
+        },
+        {
+          rel: "alternate",
+          type: "text/plain",
+          title: "CampusLoop AI & LLM Marketplace Guide",
+          href: "/llms.txt",
+        },
+      ],
+    }),
+    shellComponent: RootShell,
+    component: RootComponent,
+    notFoundComponent: NotFoundComponent,
+    errorComponent: ErrorComponent,
+  },
+);
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
@@ -179,6 +209,11 @@ function RootShell({ children }: { children: ReactNode }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(buildStructuredDataGraph()),
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","zgwz8tk9au");`,
           }}
         />
         <HeadContent />
