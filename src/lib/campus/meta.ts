@@ -11,7 +11,10 @@ export function getCanonicalSiteUrl(): string {
     typeof import.meta !== "undefined" && import.meta.env?.["VITE_SITE_URL"]
       ? String(import.meta.env["VITE_SITE_URL"]).trim()
       : "";
-  if (configured && !STALE_SITE_HOSTS.some((host) => configured.includes(host))) {
+  if (
+    configured &&
+    !STALE_SITE_HOSTS.some((host) => configured.includes(host))
+  ) {
     return configured.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined" && window.location?.origin) {
@@ -20,7 +23,9 @@ export function getCanonicalSiteUrl(): string {
   return DEFAULT_SITE_URL;
 }
 
-export function resolveAbsoluteOgImage(imagePath = "/og-marketplace.jpg"): string {
+export function resolveAbsoluteOgImage(
+  imagePath = "/og-marketplace.jpg",
+): string {
   if (/^https?:\/\//i.test(imagePath)) return imagePath;
   const normalized = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
   return `${getCanonicalSiteUrl()}${normalized}`;
@@ -124,17 +129,23 @@ export const pageHead = (
     type?: "website" | "profile";
     noIndex?: boolean;
     keywords?: string;
+    exactTitle?: string;
   },
 ) => {
-  const fullTitle = `${title} · ${BRAND} Campus Marketplace`;
+  const fullTitle =
+    options?.exactTitle || `${title} · ${BRAND} Campus Marketplace`;
   const canonicalBase = getCanonicalSiteUrl();
   const normalizedPath = options?.path
     ? options.path.startsWith("/")
       ? options.path
       : `/${options.path}`
     : undefined;
-  const canonicalUrl = normalizedPath ? `${canonicalBase}${normalizedPath}` : undefined;
-  const imageUrl = resolveAbsoluteOgImage(options?.imagePath || "/og-marketplace.jpg");
+  const canonicalUrl = normalizedPath
+    ? `${canonicalBase}${normalizedPath}`
+    : undefined;
+  const imageUrl = resolveAbsoluteOgImage(
+    options?.imagePath || "/og-marketplace.jpg",
+  );
   const imageAlt =
     options?.imageAlt ||
     `${BRAND} — Ghana University Campus Marketplace showing student products and services priced in GH₵`;
@@ -152,7 +163,12 @@ export const pageHead = (
       { name: "author", content: BRAND },
       ...(options?.noIndex
         ? [{ name: "robots", content: "noindex, nofollow" }]
-        : [{ name: "robots", content: "index, follow, max-image-preview:large" }]),
+        : [
+            {
+              name: "robots",
+              content: "index, follow, max-image-preview:large",
+            },
+          ]),
       { property: "og:site_name", content: `${BRAND} Marketplace` },
       { property: "og:locale", content: "en_GH" },
       { property: "og:title", content: fullTitle },
@@ -171,6 +187,9 @@ export const pageHead = (
       { name: "twitter:image", content: imageUrl },
       { name: "twitter:image:alt", content: imageAlt },
     ],
-    links: canonicalUrl && !options?.noIndex ? [{ rel: "canonical", href: canonicalUrl }] : [],
+    links:
+      canonicalUrl && !options?.noIndex
+        ? [{ rel: "canonical", href: canonicalUrl }]
+        : [],
   };
 };
