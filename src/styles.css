@@ -7672,3 +7672,17 @@ html.dark .plan-card {
   background: color-mix(in oklch, #fff 16%, var(--muted));
   color: #fff;
 }
+
+/* Welcome page: keyword heading + crawlable links */
+.wel-sheet h1 {
+  font-size: clamp(1.45rem, 6.2vw, 1.9rem);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.wel-sheet nav.wel-note a {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
