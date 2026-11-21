@@ -80,10 +80,10 @@ export function LaunchSplash() {
         <div className="ls-emblem">
           <BrandMark size={72} animated />
         </div>
-        <h1 className="ls-wordmark">
+        <div className="ls-wordmark">
           {BRAND}
           <span>.</span>
-        </h1>
+        </div>
         <p className="ls-tagline">Ghana&apos;s university campus marketplace</p>
         <div className="ls-dots" aria-hidden="true">
           <span />
